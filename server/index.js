@@ -56,7 +56,11 @@ const upload = multer({
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://ravi-saree-emporium.vercel.app",
+    "http://localhost:5173"
+}));
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
 
