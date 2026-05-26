@@ -1,8 +1,0 @@
-{
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://ravisareeemporium.onrender.com/api/:path*"
-    }
-  ]
-}
