@@ -63,6 +63,13 @@ app.use('/uploads', express.static(uploadsDir));
 // ── ROUTES ──────────────────────────────────────────────────────────────────
 
 // GET /api/products
+
+// HOME
+
+app.get("/", (req, res) => {
+  res.send("Ravi Saree Emporium API is running!");
+});
+
 app.get('/api/products', (req, res) => {
   try {
     const { search } = req.query;
