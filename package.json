@@ -1,0 +1,15 @@
+{
+  "name": "ravi-saree-emporium",
+  "version": "1.0.0",
+  "description": "Product catalog manager for Ravi Saree Emporium",
+  "scripts": {
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
