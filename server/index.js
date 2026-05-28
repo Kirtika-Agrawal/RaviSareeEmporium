@@ -1,20 +1,60 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
+const multerS3 = require('multer-s3');
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Ensure directories exist
-const uploadsDir = path.join(__dirname, 'uploads');
+// ── S3 SETUP ─────────────────────────────────────────────────────────────────
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+const BUCKET = process.env.AWS_BUCKET_NAME;
+
+// Helper to delete a file from S3
+const deleteFromS3 = async (key) => {
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  } catch (err) {
+    console.error('S3 delete error:', err.message);
+  }
+};
+
+// ── MULTER S3 CONFIG ──────────────────────────────────────────────────────────
+const upload = multer({
+  storage: multerS3({
+    s3,
+    bucket: BUCKET,
+    key: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+      const fileName = `products/${uniqueSuffix}${path.extname(file.originalname)}`;
+      cb(null, fileName);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|webp/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = /image\/(jpeg|jpg|png|webp)/.test(file.mimetype);
+    if (ext || mime) cb(null, true);
+    else cb(new Error('Only JPG, PNG, WEBP images are allowed'));
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// ── DATABASE SETUP ────────────────────────────────────────────────────────────
 const dbDir = path.join(__dirname, 'database');
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
 
-// Database setup using Node.js built-in sqlite
 const db = new DatabaseSync(path.join(dbDir, 'catalog.db'));
 
 db.exec(`
@@ -29,33 +69,13 @@ db.exec(`
     product_id TEXT NOT NULL,
     variant_number INTEGER NOT NULL,
     image_path TEXT NOT NULL,
-    description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    description TEXT,
     FOREIGN KEY (product_id) REFERENCES products(product_id)
   );
 `);
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const upload = multer({
-  storage,
-  fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|webp/;
-    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-    const mime = /image\/(jpeg|jpg|png|webp)/.test(file.mimetype);
-    if (ext || mime) cb(null, true);
-    else cb(new Error('Only JPG, PNG, WEBP images are allowed'));
-  },
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
-
-// Middleware
+// ── MIDDLEWARE ────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: [
     "https://ravi-saree-emporium.vercel.app",
@@ -63,42 +83,35 @@ app.use(cors({
   ]
 }));
 app.use(express.json());
-app.use('/uploads', express.static(uploadsDir));
 
-// ── ROUTES ──────────────────────────────────────────────────────────────────
-
-// GET /api/products
-
-// HOME
+// ── ROUTES ────────────────────────────────────────────────────────────────────
 
 app.get("/", (req, res) => {
   res.send("Ravi Saree Emporium API is running!");
 });
 
+// GET /api/products
 app.get('/api/products', (req, res) => {
   try {
     const { search } = req.query;
-    let stmt;
     let products;
     if (search && search.trim()) {
-      stmt = db.prepare(`
+      products = db.prepare(`
         SELECT p.product_id, p.created_at,
           (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
           (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
         FROM products p
         WHERE p.product_id LIKE ?
         ORDER BY p.created_at DESC
-      `);
-      products = stmt.all(`%${search.trim()}%`);
+      `).all(`%${search.trim()}%`);
     } else {
-      stmt = db.prepare(`
+      products = db.prepare(`
         SELECT p.product_id, p.created_at,
           (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
           (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
         FROM products p
         ORDER BY p.created_at DESC
-      `);
-      products = stmt.all();
+      `).all();
     }
     res.json(products);
   } catch (err) {
@@ -120,11 +133,11 @@ app.get('/api/products/:productId', (req, res) => {
 });
 
 // POST /api/products
-app.post('/api/products', upload.single('image'), (req, res) => {
+app.post('/api/products', upload.single('image'), async (req, res) => {
   try {
     const { product_id, description } = req.body;
     if (!product_id || !product_id.trim()) {
-      if (req.file) fs.unlinkSync(req.file.path);
+      if (req.file) await deleteFromS3(req.file.key);
       return res.status(400).json({ error: 'Product ID is required' });
     }
     if (!req.file) return res.status(400).json({ error: 'Image is required' });
@@ -132,12 +145,15 @@ app.post('/api/products', upload.single('image'), (req, res) => {
     const pid = product_id.trim().toUpperCase();
     const existing = db.prepare('SELECT product_id FROM products WHERE product_id = ?').get(pid);
     if (existing) {
-      fs.unlinkSync(req.file.path);
+      await deleteFromS3(req.file.key);
       return res.status(409).json({ error: `Product ID "${pid}" already exists` });
     }
 
+    // Store the full S3 URL in image_path
+    const imageUrl = req.file.location;
+
     db.prepare('INSERT INTO products (product_id) VALUES (?)').run(pid);
-    db.prepare('INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, 1, ?, ?)').run(pid, req.file.filename, description || '');
+    db.prepare('INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, 1, ?, ?)').run(pid, imageUrl, description || '');
 
     const newProduct = db.prepare(`
       SELECT p.product_id, p.created_at,
@@ -148,17 +164,17 @@ app.post('/api/products', upload.single('image'), (req, res) => {
 
     res.status(201).json(newProduct);
   } catch (err) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
   }
 });
 
 // POST /api/variants
-app.post('/api/variants', upload.single('image'), (req, res) => {
+app.post('/api/variants', upload.single('image'), async (req, res) => {
   try {
     const { product_id, description } = req.body;
     if (!product_id) {
-      if (req.file) fs.unlinkSync(req.file.path);
+      if (req.file) await deleteFromS3(req.file.key);
       return res.status(400).json({ error: 'Product ID is required' });
     }
     if (!req.file) return res.status(400).json({ error: 'Image is required' });
@@ -166,57 +182,62 @@ app.post('/api/variants', upload.single('image'), (req, res) => {
     const pid = product_id.trim().toUpperCase();
     const product = db.prepare('SELECT * FROM products WHERE product_id = ?').get(pid);
     if (!product) {
-      fs.unlinkSync(req.file.path);
+      await deleteFromS3(req.file.key);
       return res.status(404).json({ error: 'Product not found' });
     }
 
     const maxVariant = db.prepare('SELECT MAX(variant_number) as max FROM variants WHERE product_id = ?').get(pid);
     const nextVariantNum = (maxVariant.max || 0) + 1;
+    const imageUrl = req.file.location;
 
-    const result = db.prepare('INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, ?, ?, ?)').run(pid, nextVariantNum, req.file.filename, description || '');
+    const result = db.prepare('INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, ?, ?, ?)').run(pid, nextVariantNum, imageUrl, description || '');
     const newVariant = db.prepare('SELECT * FROM variants WHERE id = ?').get(result.lastInsertRowid);
     res.status(201).json(newVariant);
   } catch (err) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
   }
 });
 
 // PUT /api/variants/:id
-app.put('/api/variants/:id', upload.single('image'), (req, res) => {
+app.put('/api/variants/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { description } = req.body;
     const variant = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
     if (!variant) {
-      if (req.file) fs.unlinkSync(req.file.path);
+      if (req.file) await deleteFromS3(req.file.key);
       return res.status(404).json({ error: 'Variant not found' });
     }
 
-    let newImagePath = variant.image_path;
+    let newImageUrl = variant.image_path;
     if (req.file) {
-      const oldPath = path.join(uploadsDir, variant.image_path);
-      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      newImagePath = req.file.filename;
+      // Delete old image from S3 (extract key from old URL)
+      const oldKey = variant.image_path.split('.com/')[1];
+      await deleteFromS3(oldKey);
+      newImageUrl = req.file.location;
     }
 
-    db.prepare('UPDATE variants SET image_path = ?, description = ? WHERE id = ?').run(newImagePath, description !== undefined ? description : variant.description, id);
+    db.prepare('UPDATE variants SET image_path = ?, description = ? WHERE id = ?')
+      .run(newImageUrl, description !== undefined ? description : variant.description, id);
     const updated = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
     res.json(updated);
   } catch (err) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
   }
 });
 
 // DELETE /api/variants/:id
-app.delete('/api/variants/:id', (req, res) => {
+app.delete('/api/variants/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const variant = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
     if (!variant) return res.status(404).json({ error: 'Variant not found' });
-    const imgPath = path.join(uploadsDir, variant.image_path);
-    if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+
+    const oldKey = variant.image_path.split('.com/')[1];
+    await deleteFromS3(oldKey);
+
     db.prepare('DELETE FROM variants WHERE id = ?').run(id);
     res.json({ success: true });
   } catch (err) {
@@ -225,16 +246,18 @@ app.delete('/api/variants/:id', (req, res) => {
 });
 
 // DELETE /api/products/:productId
-app.delete('/api/products/:productId', (req, res) => {
+app.delete('/api/products/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
     const product = db.prepare('SELECT * FROM products WHERE product_id = ?').get(productId);
     if (!product) return res.status(404).json({ error: 'Product not found' });
+
     const variants = db.prepare('SELECT * FROM variants WHERE product_id = ?').all(productId);
-    variants.forEach(v => {
-      const imgPath = path.join(uploadsDir, v.image_path);
-      if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-    });
+    for (const v of variants) {
+      const oldKey = v.image_path.split('.com/')[1];
+      await deleteFromS3(oldKey);
+    }
+
     db.prepare('DELETE FROM variants WHERE product_id = ?').run(productId);
     db.prepare('DELETE FROM products WHERE product_id = ?').run(productId);
     res.json({ success: true });
