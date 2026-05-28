@@ -232,6 +232,16 @@ export default function ProductPage({ productId, onBack }) {
                         >
                           ✏ Edit
                         </button>
+
+                          {/* SHARE */}
+                          <button
+                            className="btn btn-outline"
+                            onClick={() => handleShare(getImageUrl(v.image_path), v.variant_number)}
+                            style={{ padding: '5px 12px', fontSize: '0.75rem', color: 'var(--maroon)', borderColor: 'rgba(123,28,46,0.3)' }}
+                            title="Share"
+                          >
+                            ↗ Share
+                          </button>
                         <button
                           className="btn"
                           onClick={() => setDeleteVariantTarget(v)}
