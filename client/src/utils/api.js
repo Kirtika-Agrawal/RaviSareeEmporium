@@ -1,4 +1,5 @@
-const BASE = '/api';
+//const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL || 'https://ravisareeemporium.onrender.com/api';
 
 export async function fetchProducts(search = '') {
   const url = search ? `${BASE}/products?search=${encodeURIComponent(search)}` : `${BASE}/products`;
@@ -53,5 +54,9 @@ export async function deleteProduct(productId) {
 }
 
 export function getImageUrl(imagePath) {
-  return `/uploads/${imagePath}`;
+  if (!imagePath) return '';
+  // If already a full S3 URL, use it directly
+  if (imagePath.startsWith('http')) return imagePath;
+  // Fallback for any old local paths
+  return `https://ravisareeemporium.onrender.com/uploads/${imagePath}`;
 }
