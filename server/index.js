@@ -32,6 +32,15 @@ const getS3Key = (imagePath) => {
   return imagePath;
 };
 
+// Simple password auth middleware
+const requireAuth = (req, res, next) => {
+  const password = req.headers['x-admin-password'];
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+};
+
 const deleteFromS3 = async (imagePath) => {
   const key = getS3Key(imagePath);
   if (!key) return;
@@ -152,7 +161,7 @@ app.get('/api/products/:productId', (req, res) => {
 });
 
 // POST /api/products
-app.post('/api/products', upload.single('image'), async (req, res) => {
+app.post('/api/products',requireAuth, upload.single('image'), async (req, res) => {
   try {
     const { product_id, description } = req.body;
     if (!product_id || !product_id.trim()) {
@@ -189,7 +198,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
 });
 
 // POST /api/variants
-app.post('/api/variants', upload.single('image'), async (req, res) => {
+app.post('/api/variants', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const { product_id, description } = req.body;
     if (!product_id) {
@@ -219,7 +228,7 @@ app.post('/api/variants', upload.single('image'), async (req, res) => {
 });
 
 // PUT /api/variants/:id
-app.put('/api/variants/:id', upload.single('image'), async (req, res) => {
+app.put('/api/variants/:id', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { description } = req.body;
