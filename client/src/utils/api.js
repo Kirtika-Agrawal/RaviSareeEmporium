@@ -30,6 +30,7 @@ const authHeader = () => ({
 export async function createProduct(formData) {
   const res = await fetch(`${BASE}/products`, {
     method: 'POST',
+    headers: authHeader(),  // ← add this
     body: formData,
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Failed to create product');
@@ -39,6 +40,7 @@ export async function createProduct(formData) {
 export async function addVariant(formData) {
   const res = await fetch(`${BASE}/variants`, {
     method: 'POST',
+    headers: authHeader(),  // ← add this
     body: formData,
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Failed to add variant');
@@ -48,6 +50,7 @@ export async function addVariant(formData) {
 export async function updateVariant(id, formData) {
   const res = await fetch(`${BASE}/variants/${id}`, {
     method: 'PUT',
+    headers: authHeader(),  // ← add this
     body: formData,
   });
   if (!res.ok) throw new Error((await res.json()).error || 'Failed to update variant');
@@ -55,13 +58,19 @@ export async function updateVariant(id, formData) {
 }
 
 export async function deleteVariant(id) {
-  const res = await fetch(`${BASE}/variants/${id}`, { method: 'DELETE' });
+  const res = await fetch(`${BASE}/variants/${id}`, {
+    method: 'DELETE',
+    headers: authHeader(),  // ← add this
+  });
   if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete variant');
   return res.json();
 }
 
 export async function deleteProduct(productId) {
-  const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, { method: 'DELETE' });
+  const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, {
+    method: 'DELETE',
+    headers: authHeader(),  // ← add this
+  });
   if (!res.ok) throw new Error((await res.json()).error || 'Failed to delete product');
   return res.json();
 }
