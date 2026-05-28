@@ -3,14 +3,13 @@ const cors = require('cors');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
-const fs = require('fs');
-const { DatabaseSync } = require('node:sqlite');
 const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { createClient } = require('@libsql/client');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ── S3 SETUP ─────────────────────────────────────────────────────────────────
+// ── S3 SETUP ──────────────────────────────────────────────────────────────────
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -21,24 +20,10 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.AWS_BUCKET_NAME;
 
-// Helper to extract S3 key from either a full URL or just a key
 const getS3Key = (imagePath) => {
   if (!imagePath) return null;
-  if (imagePath.startsWith('http')) {
-    // Full S3 URL — extract key after .com/
-    return imagePath.split('.amazonaws.com/')[1];
-  }
-  // Already just a key/filename
+  if (imagePath.startsWith('http')) return imagePath.split('.amazonaws.com/')[1];
   return imagePath;
-};
-
-// Simple password auth middleware
-const requireAuth = (req, res, next) => {
-  const password = req.headers['x-admin-password'];
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
 };
 
 const deleteFromS3 = async (imagePath) => {
@@ -50,6 +35,7 @@ const deleteFromS3 = async (imagePath) => {
     console.error('S3 delete error:', err.message);
   }
 };
+
 // ── MULTER S3 CONFIG ──────────────────────────────────────────────────────────
 const upload = multer({
   storage: multerS3({
@@ -57,8 +43,7 @@ const upload = multer({
     bucket: BUCKET,
     key: (req, file, cb) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      const fileName = `products/${uniqueSuffix}${path.extname(file.originalname)}`;
-      cb(null, fileName);
+      cb(null, `products/${uniqueSuffix}${path.extname(file.originalname)}`);
     },
   }),
   fileFilter: (req, file, cb) => {
@@ -71,29 +56,33 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// ── DATABASE SETUP ────────────────────────────────────────────────────────────
-const dbDir = path.join(__dirname, 'database');
-if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+// ── TURSO DATABASE SETUP ──────────────────────────────────────────────────────
+const db = createClient({
+  url: process.env.TURSO_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-const db = new DatabaseSync(path.join(dbDir, 'catalog.db'));
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id TEXT UNIQUE NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS variants (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_id TEXT NOT NULL,
-    variant_number INTEGER NOT NULL,
-    image_path TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    description TEXT,
-    FOREIGN KEY (product_id) REFERENCES products(product_id)
-  );
-`);
+const initDb = async () => {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id TEXT UNIQUE NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS variants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id TEXT NOT NULL,
+      variant_number INTEGER NOT NULL,
+      image_path TEXT NOT NULL,
+      description TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(product_id)
+    )
+  `);
+  console.log('✅ Turso database ready');
+};
 
 // ── MIDDLEWARE ────────────────────────────────────────────────────────────────
 app.use(cors({
@@ -102,7 +91,6 @@ app.use(cors({
       "https://ravi-saree-emporium.vercel.app",
       "http://localhost:5173"
     ];
-    // Allow any Vercel preview deployments
     if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
@@ -112,56 +100,75 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
+const requireAuth = (req, res, next) => {
+  const password = req.headers['x-admin-password'];
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+};
+
 // ── ROUTES ────────────────────────────────────────────────────────────────────
 
-app.get("/", (req, res) => {
-  res.send("Ravi Saree Emporium API is running!");
+app.get('/', (req, res) => {
+  res.send('🪷 Ravi Saree Emporium API is running!');
 });
 
 // GET /api/products
-app.get('/api/products', (req, res) => {
+app.get('/api/products', async (req, res) => {
   try {
     const { search } = req.query;
-    let products;
+    let result;
     if (search && search.trim()) {
-      products = db.prepare(`
-        SELECT p.product_id, p.created_at,
-          (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
-          (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
-        FROM products p
-        WHERE p.product_id LIKE ?
-        ORDER BY p.created_at DESC
-      `).all(`%${search.trim()}%`);
+      result = await db.execute({
+        sql: `
+          SELECT p.product_id, p.created_at,
+            (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
+            (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
+          FROM products p
+          WHERE p.product_id LIKE ?
+          ORDER BY p.created_at DESC
+        `,
+        args: [`%${search.trim()}%`]
+      });
     } else {
-      products = db.prepare(`
+      result = await db.execute(`
         SELECT p.product_id, p.created_at,
           (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
           (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
         FROM products p
         ORDER BY p.created_at DESC
-      `).all();
+      `);
     }
-    res.json(products);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/products/:productId
-app.get('/api/products/:productId', (req, res) => {
+app.get('/api/products/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
-    const product = db.prepare('SELECT * FROM products WHERE product_id = ?').get(productId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
-    const variants = db.prepare('SELECT * FROM variants WHERE product_id = ? ORDER BY variant_number ASC').all(productId);
-    res.json({ ...product, variants });
+    const productResult = await db.execute({
+      sql: 'SELECT * FROM products WHERE product_id = ?',
+      args: [productId]
+    });
+    if (productResult.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
+
+    const variantsResult = await db.execute({
+      sql: 'SELECT * FROM variants WHERE product_id = ? ORDER BY variant_number ASC',
+      args: [productId]
+    });
+    res.json({ ...productResult.rows[0], variants: variantsResult.rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // POST /api/products
-app.post('/api/products',requireAuth, upload.single('image'), async (req, res) => {
+app.post('/api/products', requireAuth, upload.single('image'), async (req, res) => {
   try {
     const { product_id, description } = req.body;
     if (!product_id || !product_id.trim()) {
@@ -171,26 +178,32 @@ app.post('/api/products',requireAuth, upload.single('image'), async (req, res) =
     if (!req.file) return res.status(400).json({ error: 'Image is required' });
 
     const pid = product_id.trim().toUpperCase();
-    const existing = db.prepare('SELECT product_id FROM products WHERE product_id = ?').get(pid);
-    if (existing) {
+    const existing = await db.execute({
+      sql: 'SELECT product_id FROM products WHERE product_id = ?',
+      args: [pid]
+    });
+    if (existing.rows.length > 0) {
       await deleteFromS3(req.file.key);
       return res.status(409).json({ error: `Product ID "${pid}" already exists` });
     }
 
-    // Store the full S3 URL in image_path
     const imageUrl = req.file.location;
+    await db.execute({ sql: 'INSERT INTO products (product_id) VALUES (?)', args: [pid] });
+    await db.execute({
+      sql: 'INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, 1, ?, ?)',
+      args: [pid, imageUrl, description || '']
+    });
 
-    db.prepare('INSERT INTO products (product_id) VALUES (?)').run(pid);
-    db.prepare('INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, 1, ?, ?)').run(pid, imageUrl, description || '');
-
-    const newProduct = db.prepare(`
-      SELECT p.product_id, p.created_at,
-        (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
-        (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
-      FROM products p WHERE p.product_id = ?
-    `).get(pid);
-
-    res.status(201).json(newProduct);
+    const newProduct = await db.execute({
+      sql: `
+        SELECT p.product_id, p.created_at,
+          (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
+          (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
+        FROM products p WHERE p.product_id = ?
+      `,
+      args: [pid]
+    });
+    res.status(201).json(newProduct.rows[0]);
   } catch (err) {
     if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
@@ -208,19 +221,31 @@ app.post('/api/variants', requireAuth, upload.single('image'), async (req, res) 
     if (!req.file) return res.status(400).json({ error: 'Image is required' });
 
     const pid = product_id.trim().toUpperCase();
-    const product = db.prepare('SELECT * FROM products WHERE product_id = ?').get(pid);
-    if (!product) {
+    const product = await db.execute({
+      sql: 'SELECT * FROM products WHERE product_id = ?',
+      args: [pid]
+    });
+    if (product.rows.length === 0) {
       await deleteFromS3(req.file.key);
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const maxVariant = db.prepare('SELECT MAX(variant_number) as max FROM variants WHERE product_id = ?').get(pid);
-    const nextVariantNum = (maxVariant.max || 0) + 1;
+    const maxVariant = await db.execute({
+      sql: 'SELECT MAX(variant_number) as max FROM variants WHERE product_id = ?',
+      args: [pid]
+    });
+    const nextVariantNum = (maxVariant.rows[0].max || 0) + 1;
     const imageUrl = req.file.location;
 
-    const result = db.prepare('INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, ?, ?, ?)').run(pid, nextVariantNum, imageUrl, description || '');
-    const newVariant = db.prepare('SELECT * FROM variants WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json(newVariant);
+    const result = await db.execute({
+      sql: 'INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, ?, ?, ?)',
+      args: [pid, nextVariantNum, imageUrl, description || '']
+    });
+    const newVariant = await db.execute({
+      sql: 'SELECT * FROM variants WHERE id = ?',
+      args: [result.lastInsertRowid]
+    });
+    res.status(201).json(newVariant.rows[0]);
   } catch (err) {
     if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
@@ -232,23 +257,31 @@ app.put('/api/variants/:id', requireAuth, upload.single('image'), async (req, re
   try {
     const { id } = req.params;
     const { description } = req.body;
-    const variant = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
-    if (!variant) {
+    const variantResult = await db.execute({
+      sql: 'SELECT * FROM variants WHERE id = ?',
+      args: [id]
+    });
+    if (variantResult.rows.length === 0) {
       if (req.file) await deleteFromS3(req.file.key);
       return res.status(404).json({ error: 'Variant not found' });
     }
 
+    const variant = variantResult.rows[0];
     let newImageUrl = variant.image_path;
     if (req.file) {
-      // Delete old image from S3 (extract key from old URL)
       await deleteFromS3(variant.image_path);
       newImageUrl = req.file.location;
     }
 
-    db.prepare('UPDATE variants SET image_path = ?, description = ? WHERE id = ?')
-      .run(newImageUrl, description !== undefined ? description : variant.description, id);
-    const updated = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
-    res.json(updated);
+    await db.execute({
+      sql: 'UPDATE variants SET image_path = ?, description = ? WHERE id = ?',
+      args: [newImageUrl, description !== undefined ? description : variant.description, id]
+    });
+    const updated = await db.execute({
+      sql: 'SELECT * FROM variants WHERE id = ?',
+      args: [id]
+    });
+    res.json(updated.rows[0]);
   } catch (err) {
     if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
@@ -256,15 +289,17 @@ app.put('/api/variants/:id', requireAuth, upload.single('image'), async (req, re
 });
 
 // DELETE /api/variants/:id
-app.delete('/api/variants/:id', async (req, res) => {
+app.delete('/api/variants/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const variant = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
-    if (!variant) return res.status(404).json({ error: 'Variant not found' });
+    const variantResult = await db.execute({
+      sql: 'SELECT * FROM variants WHERE id = ?',
+      args: [id]
+    });
+    if (variantResult.rows.length === 0) return res.status(404).json({ error: 'Variant not found' });
 
-    await deleteFromS3(variant.image_path);
-
-    db.prepare('DELETE FROM variants WHERE id = ?').run(id);
+    await deleteFromS3(variantResult.rows[0].image_path);
+    await db.execute({ sql: 'DELETE FROM variants WHERE id = ?', args: [id] });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -272,25 +307,37 @@ app.delete('/api/variants/:id', async (req, res) => {
 });
 
 // DELETE /api/products/:productId
-app.delete('/api/products/:productId', async (req, res) => {
+app.delete('/api/products/:productId', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params;
-    const product = db.prepare('SELECT * FROM products WHERE product_id = ?').get(productId);
-    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const productResult = await db.execute({
+      sql: 'SELECT * FROM products WHERE product_id = ?',
+      args: [productId]
+    });
+    if (productResult.rows.length === 0) return res.status(404).json({ error: 'Product not found' });
 
-    const variants = db.prepare('SELECT * FROM variants WHERE product_id = ?').all(productId);
-    for (const v of variants) {
+    const variantsResult = await db.execute({
+      sql: 'SELECT * FROM variants WHERE product_id = ?',
+      args: [productId]
+    });
+    for (const v of variantsResult.rows) {
       await deleteFromS3(v.image_path);
     }
 
-    db.prepare('DELETE FROM variants WHERE product_id = ?').run(productId);
-    db.prepare('DELETE FROM products WHERE product_id = ?').run(productId);
+    await db.execute({ sql: 'DELETE FROM variants WHERE product_id = ?', args: [productId] });
+    await db.execute({ sql: 'DELETE FROM products WHERE product_id = ?', args: [productId] });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🪷 Ravi Saree Emporium Server running on http://localhost:${PORT}`);
+// ── START SERVER ──────────────────────────────────────────────────────────────
+initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🪷 Ravi Saree Emporium Server running on http://localhost:${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });
