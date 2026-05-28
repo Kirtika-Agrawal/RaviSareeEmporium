@@ -28,9 +28,12 @@ const getS3Key = (imagePath) => {
 
 const deleteFromS3 = async (imagePath) => {
   const key = getS3Key(imagePath);
+  console.log('Deleting from S3 - imagePath:', imagePath);
+  console.log('Deleting from S3 - key:', key);
   if (!key) return;
   try {
     await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    console.log('S3 delete success:', key);
   } catch (err) {
     console.error('S3 delete error:', err.message);
   }
