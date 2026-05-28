@@ -13,6 +13,19 @@ export async function fetchProduct(productId) {
   if (!res.ok) throw new Error((await res.json()).error || 'Product not found');
   return res.json();
 }
+// Save password in session (clears when browser closes)
+export const setAdminPassword = (password) => {
+  sessionStorage.setItem('adminPassword', password);
+};
+
+export const getAdminPassword = () => {
+  return sessionStorage.getItem('adminPassword') || '';
+};
+
+// Add this header to all write requests
+const authHeader = () => ({
+  'x-admin-password': getAdminPassword()
+});
 
 export async function createProduct(formData) {
   const res = await fetch(`${BASE}/products`, {
