@@ -12,7 +12,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   // Password gate
-  const [password, setPassword] = useState(getAdminPassword());
+  const [password, setPassword] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
