@@ -21,15 +21,26 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.AWS_BUCKET_NAME;
 
-// Helper to delete a file from S3
-const deleteFromS3 = async (key) => {
+// Helper to extract S3 key from either a full URL or just a key
+const getS3Key = (imagePath) => {
+  if (!imagePath) return null;
+  if (imagePath.startsWith('http')) {
+    // Full S3 URL — extract key after .com/
+    return imagePath.split('.amazonaws.com/')[1];
+  }
+  // Already just a key/filename
+  return imagePath;
+};
+
+const deleteFromS3 = async (imagePath) => {
+  const key = getS3Key(imagePath);
+  if (!key) return;
   try {
     await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
   } catch (err) {
     console.error('S3 delete error:', err.message);
   }
 };
-
 // ── MULTER S3 CONFIG ──────────────────────────────────────────────────────────
 const upload = multer({
   storage: multerS3({
@@ -221,8 +232,7 @@ app.put('/api/variants/:id', upload.single('image'), async (req, res) => {
     let newImageUrl = variant.image_path;
     if (req.file) {
       // Delete old image from S3 (extract key from old URL)
-      const oldKey = variant.image_path.split('.com/')[1];
-      await deleteFromS3(oldKey);
+      await deleteFromS3(variant.image_path);
       newImageUrl = req.file.location;
     }
 
@@ -243,8 +253,7 @@ app.delete('/api/variants/:id', async (req, res) => {
     const variant = db.prepare('SELECT * FROM variants WHERE id = ?').get(id);
     if (!variant) return res.status(404).json({ error: 'Variant not found' });
 
-    const oldKey = variant.image_path.split('.com/')[1];
-    await deleteFromS3(oldKey);
+    await deleteFromS3(variant.image_path);
 
     db.prepare('DELETE FROM variants WHERE id = ?').run(id);
     res.json({ success: true });
@@ -262,8 +271,7 @@ app.delete('/api/products/:productId', async (req, res) => {
 
     const variants = db.prepare('SELECT * FROM variants WHERE product_id = ?').all(productId);
     for (const v of variants) {
-      const oldKey = v.image_path.split('.com/')[1];
-      await deleteFromS3(oldKey);
+      await deleteFromS3(v.image_path);
     }
 
     db.prepare('DELETE FROM variants WHERE product_id = ?').run(productId);
