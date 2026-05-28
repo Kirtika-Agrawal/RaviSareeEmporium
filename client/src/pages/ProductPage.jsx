@@ -73,6 +73,37 @@ export default function ProductPage({ productId, onBack }) {
     }
   };
 
+  const handleShare = (imageUrl, variantNumber) => {
+  const text = `Check out this saree - Colour ${variantNumber} of ${productId}`;
+  const encodedText = encodeURIComponent(text);
+  const encodedUrl = encodeURIComponent(imageUrl);
+
+  const platforms = {
+    whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    instagram: null, // Instagram doesn't support direct URL sharing
+    telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+  };
+
+  // Use native share sheet if available (mobile)
+  if (navigator.share) {
+    navigator.share({
+      title: `${productId} - Colour ${variantNumber}`,
+      text: text,
+      url: imageUrl,
+    });
+    return;
+  }
+
+  // Fallback: show share options
+  const choice = prompt(
+    'Share via:\n1. WhatsApp\n2. Facebook\n3. Telegram\n\nEnter number:'
+  );
+  if (choice === '1') window.open(platforms.whatsapp, '_blank');
+  if (choice === '2') window.open(platforms.facebook, '_blank');
+  if (choice === '3') window.open(platforms.telegram, '_blank');
+};
+
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
       {/* Header */}
