@@ -32,27 +32,21 @@ export default function ProductPage({ productId, onBack }) {
 
   const handleVariantSaved = () => { load(); };
 
-  const handleDeleteVariant = async () => {
-    try {
-      await deleteVariant(deleteVariantTarget.id);
-      toast('Colour variant deleted');
-      setDeleteVariantTarget(null);
-      load();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
-  };
+ // ProductPage.jsx — remove try/catch from both delete handlers
 
-  const handleDeleteProduct = async () => {
-    try {
-      await deleteProduct(productId);
-      toast(`Product ${productId} deleted`);
-      onBack();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
-  };
+const handleDeleteVariant = async () => {
+  await deleteVariant(deleteVariantTarget.id);
+  toast('Colour variant deleted');
+  setDeleteVariantTarget(null);
+  load();
+};
 
+const handleDeleteProduct = async () => {
+  await deleteProduct(productId);
+  toast(`Product ${productId} deleted`);
+  onBack();
+};
+  
   const toggleDesc = (id) => {
     setExpandedDesc(prev => ({ ...prev, [id]: !prev[id] }));
   };
