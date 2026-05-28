@@ -77,10 +77,18 @@ db.exec(`
 
 // ── MIDDLEWARE ────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    "https://ravi-saree-emporium.vercel.app",
-    "http://localhost:5173"
-  ]
+  origin: (origin, callback) => {
+    const allowed = [
+      "https://ravi-saree-emporium.vercel.app",
+      "http://localhost:5173"
+    ];
+    // Allow any Vercel preview deployments
+    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
 }));
 app.use(express.json());
 
