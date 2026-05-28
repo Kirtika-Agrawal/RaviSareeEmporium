@@ -4,6 +4,7 @@ import { useToast } from '../hooks/useToast';
 import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
 
+
 export default function ProductPage({ productId, onBack }) {
   const toast = useToast();
   const [product, setProduct] = useState(null);
@@ -14,6 +15,7 @@ export default function ProductPage({ productId, onBack }) {
   const [showDeleteProduct, setShowDeleteProduct] = useState(false);
   const [imgErrors, setImgErrors] = useState({});
   const [expandedDesc, setExpandedDesc] = useState({});
+  const [viewImage, setViewImage] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -223,7 +225,10 @@ export default function ProductPage({ productId, onBack }) {
                       background: 'linear-gradient(135deg, #e8d5b0, #d4b896)',
                       overflow: 'hidden',
                       position: 'relative',
-                    }}>
+                      cursor: 'zoom-in'
+                    }}
+                        onClick={() => setViewImage(getImageUrl(v.image_path))}  // ← add this
+                      >
                       {!imgErrors[v.id] ? (
                         <img
                           src={getImageUrl(v.image_path)}
@@ -323,6 +328,51 @@ export default function ProductPage({ productId, onBack }) {
           onCancel={() => setShowDeleteProduct(false)}
         />
       )}
+      {/* Fullscreen Image Viewer */}
+  {viewImage && (
+  <div
+    onClick={() => setViewImage(null)}
+    style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.92)',
+      zIndex: 999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+    }}
+  >
+    <button
+      onClick={() => setViewImage(null)}
+      style={{
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        background: 'rgba(201,168,76,0.15)',
+        border: '1px solid rgba(201,168,76,0.4)',
+        color: 'var(--gold)',
+        borderRadius: '50%',
+        width: 40,
+        height: 40,
+        fontSize: '1.2rem',
+        cursor: 'pointer',
+      }}
+    >✕</button>
+    <img
+      src={viewImage}
+      alt="Full view"
+      style={{
+        maxWidth: '100%',
+        maxHeight: '90vh',
+        objectFit: 'contain',
+        borderRadius: 12,
+        boxShadow: '0 8px 40px rgba(0,0,0,0.8)',
+      }}
+      onClick={e => e.stopPropagation()}
+    />
+  </div>
+)}
     </div>
   );
 }
