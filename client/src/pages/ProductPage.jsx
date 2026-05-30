@@ -52,63 +52,56 @@ export default function ProductPage({ productId, onBack }) {
     onBack();
   };
 
-  const handleShareSelected = async () => {
-    const selected = product.variants.filter(v => selectedVariants.includes(v.id));
+ const handleShareSelected = async () => {
+  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
 
-    if (navigator.canShare) {
-      try {
-        toast('Fetching images...', 'info');
+  // ── Try native file share (mobile only) ───────────────────────────────────
+  if (isMobile && navigator.canShare) {
+    try {
+      toast('Preparing images...', 'info');
 
-        const files = await Promise.all(
-          selected.map(async (v) => {
-            const url = getImageUrl(v.image_path);
-            console.log('Fetching:', url);
-            const res = await fetch(url);
-            console.log('Response ok:', res.ok, 'Type:', res.type);
-            const blob = await res.blob();
-            console.log('Blob size:', blob.size, 'Blob type:', blob.type);
-            const ext = url.split('.').pop().split('?')[0] || 'jpg';
-            return new File(
-              [blob],
-              `${productId}-Colour${v.variant_number}.${ext}`,
-              { type: blob.type }
-            );
-          })
-        );
+      const files = await Promise.all(
+        selected.map(async (v) => {
+          const imageUrl = getImageUrl(v.image_path);
+          const res = await fetch(imageUrl);
+          if (!res.ok) throw new Error('Fetch failed');
+          const blob = await res.blob();
+          const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+          return new File(
+            [blob],
+            `${productId}-Colour${v.variant_number}.${ext}`,
+            { type: blob.type }
+          );
+        })
+      );
 
-        console.log('Files ready:', files);
-        console.log('canShare files?', navigator.canShare({ files }));
-
-        if (navigator.canShare({ files })) {
-          await navigator.share({
-            title: `${productId} - Selected Colour Variants`,
-            text: `${productId} - ${selected.length} colour variant${selected.length > 1 ? 's' : ''}`,
-            files,
-          });
-          return;
-        } else {
-          console.log('canShare returned false for files');
-        }
-      } catch (err) {
-        console.error('File share error:', err.name, err.message);
+      if (navigator.canShare({ files })) {
+        await navigator.share({
+          title: `${productId} - Colour Variants`,
+          text: `${productId} - ${selected.length} colour variant${selected.length > 1 ? 's' : ''}`,
+          files,
+        });
+        return;
       }
-    } else {
-      console.log('navigator.canShare not available');
+    } catch (err) {
+      console.error('File share failed:', err.message);
+      // fall through to WhatsApp link fallback below
     }
+  }
 
-    // Fallback: share as text links
-    const text = selected.map(v =>
-      `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
-    ).join('\n\n');
-    const message = `*${productId}* - Selected Colour Variants:\n\n${text}`;
+  // ── Fallback: WhatsApp with image links ───────────────────────────────────
+  const text = selected.map(v =>
+    `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
+  ).join('\n\n');
+  const message = `*${productId}* - Colour Variants:\n\n${text}`;
 
-    if (navigator.share) {
-      navigator.share({ title: productId, text: message });
-    } else {
-      const encoded = encodeURIComponent(message);
-      window.open(`https://wa.me/?text=${encoded}`, '_blank');
-    }
-  };
+  if (navigator.share) {
+    navigator.share({ title: productId, text: message });
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  }
+};
 
   const handleDownload = async (e, imageUrl) => {
     e.stopPropagation();
