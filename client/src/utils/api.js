@@ -75,6 +75,11 @@ export async function deleteProduct(productId) {
   return res.json();
 }
 
+export function getProxyUrl(imagePath) {
+  const imageUrl = getImageUrl(imagePath);
+  return `https://ravisareeemporium.onrender.com/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+}
+
 export function getImageUrl(imagePath) {
   if (!imagePath) return '';
   // If already a full S3 URL, use it directly
