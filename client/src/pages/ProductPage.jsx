@@ -52,7 +52,7 @@ export default function ProductPage({ productId, onBack }) {
     onBack();
   };
 
- const handleShareSelected = async () => {
+/* const handleShareSelected = async () => {
   const selected = product.variants.filter(v => selectedVariants.includes(v.id));
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
 
@@ -101,6 +101,36 @@ export default function ProductPage({ productId, onBack }) {
   } else {
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   }
+}; */
+
+  const handleShareSelected = async () => {
+  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
+  
+  toast(`Downloading ${selected.length} image${selected.length > 1 ? 's' : ''}...`, 'info');
+
+  for (const v of selected) {
+    const imageUrl = getImageUrl(v.image_path);
+    try {
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+      const fileName = `${productId}-Colour${v.variant_number}.${ext}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      // small delay between downloads
+      await new Promise(r => setTimeout(r, 400));
+    } catch (err) {
+      toast(`Failed to download Colour ${v.variant_number}`, 'error');
+    }
+  }
+
+  toast('Images saved! Now share from your gallery 📲', 'success');
 };
 
   const handleDownload = async (e, imageUrl) => {
@@ -198,12 +228,14 @@ export default function ProductPage({ productId, onBack }) {
             {/* Top bar: share selected + add variant */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', gap: 8 }}>
+              
+
                 {selectedVariants.length > 0 && (
                   <button
                     className="btn btn-gold"
                     onClick={handleShareSelected}
                   >
-                    ↗ Share {selectedVariants.length} Selected
+                    ⬇ Download {selectedVariants.length} Selected
                   </button>
                 )}
                 {selectedVariants.length > 0 && (
