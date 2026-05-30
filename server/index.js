@@ -87,6 +87,25 @@ const initDb = async () => {
   console.log('✅ Turso database ready');
 };
 
+const https = require('https');
+
+app.get('/api/image-proxy', async (req, res) => {
+  const { url } = req.query;
+  
+  // Security: only allow your own S3 bucket
+  if (!url || !url.startsWith(`https://${BUCKET}`)) {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  https.get(url, (stream) => {
+    res.setHeader('Content-Type', stream.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    stream.pipe(res);
+  }).on('error', (err) => {
+    res.status(500).json({ error: err.message });
+  });
+});
+
 // ── MIDDLEWARE ────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, callback) => {
