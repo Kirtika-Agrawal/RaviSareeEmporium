@@ -211,31 +211,8 @@ export default function ProductPage({ productId, onBack }) {
                     style={{
                       animationDelay: `${i * 0.06}s`,
                       overflow: 'hidden',
-                      position: 'relative',
                     }}
                   >
-                  {/* Checkbox */}
-                    <div
-                      onClick={() => toggleSelect(v.id)}
-                      style={{
-                        position: 'absolute',
-                        top: 10,
-                        left: 10,
-                        zIndex: 10,
-                        width: 22,
-                        height: 22,
-                        borderRadius: 6,
-                        border: `2px solid ${selectedVariants.includes(v.id) ? 'var(--gold)' : 'rgba(201,168,76,0.4)'}`,
-                        background: selectedVariants.includes(v.id) ? 'var(--gold)' : 'rgba(61,13,24,0.7)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                      }}
-                    >
-                      {selectedVariants.includes(v.id) && '✓'}
-                    </div>
                     {/* Variant label */}
                     <div style={{
                       padding: '10px 16px 8px',
@@ -255,31 +232,42 @@ export default function ProductPage({ productId, onBack }) {
                         </span>
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => setEditVariant(v)}
-                          style={{
-                            padding: '5px 12px',
-                            fontSize: '0.75rem',
-                            color: 'var(--maroon)',
-                            borderColor: 'rgba(123,28,46,0.3)',
-                          }}
-                        >
-                          ✏ Edit
-                        </button>
-                        <button
-                          className="btn"
-                          onClick={() => setDeleteVariantTarget(v)}
-                          style={{
-                            background: 'none',
-                            color: '#c0392b',
-                            padding: '5px 10px',
-                            fontSize: '0.75rem',
-                          }}
-                        >
-                          🗑
-                        </button>
-                      </div>
+  {/* ADD THIS */}
+  <div
+    onClick={() => toggleSelect(v.id)}
+    style={{
+      width: 28,
+      height: 28,
+      borderRadius: 6,
+      border: `2px solid ${selectedVariants.includes(v.id) ? 'var(--gold)' : 'rgba(201,168,76,0.4)'}`,
+      background: selectedVariants.includes(v.id) ? 'var(--gold)' : 'transparent',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      fontSize: '0.8rem',
+      color: 'var(--maroon)',
+      flexShrink: 0,
+    }}
+  >
+    {selectedVariants.includes(v.id) && '✓'}
+  </div>
+
+  <button
+    className="btn btn-outline"
+    onClick={() => setEditVariant(v)}
+    style={{ padding: '5px 12px', fontSize: '0.75rem', color: 'var(--maroon)', borderColor: 'rgba(123,28,46,0.3)' }}
+  >
+    ✏ Edit
+  </button>
+  <button
+    className="btn"
+    onClick={() => setDeleteVariantTarget(v)}
+    style={{ background: 'none', color: '#c0392b', padding: '5px 10px', fontSize: '0.75rem' }}
+  >
+    🗑
+  </button>
+</div>
                     </div>
 
                     {/* Image */}
