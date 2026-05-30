@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { fetchProduct, deleteVariant, deleteProduct, getImageUrl } from '../utils/api';
+import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -57,11 +57,10 @@ const handleDownloadSelected = async () => {
   toast(`Downloading ${selected.length} image${selected.length > 1 ? 's' : ''}...`, 'info');
 
   for (const v of selected) {
-    const imageUrl = getImageUrl(v.image_path);
     try {
-      const res = await fetch(imageUrl);
+      const res = await fetch(getProxyUrl(v.image_path)); // ← proxy
       const blob = await res.blob();
-      const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+      const ext = getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg';
       const fileName = `${productId}-Colour${v.variant_number}.${ext}`;
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -84,15 +83,13 @@ const handleDownloadSelected = async () => {
 
 const handleShareSelected = async () => {
   const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-
   try {
     toast('Preparing...', 'info');
     const files = await Promise.all(
       selected.map(async (v) => {
-        const imageUrl = getImageUrl(v.image_path);
-        const res = await fetch(imageUrl);
+        const res = await fetch(getProxyUrl(v.image_path)); // ← proxy
         const blob = await res.blob();
-        const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+        const ext = getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg';
         return new File(
           [blob],
           `${productId}-Colour${v.variant_number}.${ext}`,
@@ -100,7 +97,6 @@ const handleShareSelected = async () => {
         );
       })
     );
-
     if (navigator.canShare && navigator.canShare({ files })) {
       await navigator.share({ files });
       return;
@@ -108,8 +104,7 @@ const handleShareSelected = async () => {
   } catch (err) {
     console.error('Share failed:', err.message);
   }
-
-  // Fallback — open images directly in new tabs (user can long-press save)
+  // Fallback
   const selected2 = product.variants.filter(v => selectedVariants.includes(v.id));
   for (const v of selected2) {
     window.open(getImageUrl(v.image_path), '_blank');
