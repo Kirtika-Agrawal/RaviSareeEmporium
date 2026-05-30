@@ -52,60 +52,8 @@ export default function ProductPage({ productId, onBack }) {
     onBack();
   };
 
-/* const handleShareSelected = async () => {
+const handleDownloadSelected = async () => {
   const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-
-  // ── Try native file share (mobile only) ───────────────────────────────────
-  if (isMobile && navigator.canShare) {
-    try {
-      toast('Preparing images...', 'info');
-
-      const files = await Promise.all(
-        selected.map(async (v) => {
-          const imageUrl = getImageUrl(v.image_path);
-          const res = await fetch(imageUrl);
-          if (!res.ok) throw new Error('Fetch failed');
-          const blob = await res.blob();
-          const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
-          return new File(
-            [blob],
-            `${productId}-Colour${v.variant_number}.${ext}`,
-            { type: blob.type }
-          );
-        })
-      );
-
-      if (navigator.canShare({ files })) {
-        await navigator.share({
-          title: `${productId} - Colour Variants`,
-          text: `${productId} - ${selected.length} colour variant${selected.length > 1 ? 's' : ''}`,
-          files,
-        });
-        return;
-      }
-    } catch (err) {
-      console.error('File share failed:', err.message);
-      // fall through to WhatsApp link fallback below
-    }
-  }
-
-  // ── Fallback: WhatsApp with image links ───────────────────────────────────
-  const text = selected.map(v =>
-    `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
-  ).join('\n\n');
-  const message = `*${productId}* - Colour Variants:\n\n${text}`;
-
-  if (navigator.share) {
-    navigator.share({ title: productId, text: message });
-  } else {
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
-  }
-}; */
-
-  const handleShareSelected = async () => {
-  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-  
   toast(`Downloading ${selected.length} image${selected.length > 1 ? 's' : ''}...`, 'info');
 
   for (const v of selected) {
@@ -115,22 +63,58 @@ export default function ProductPage({ productId, onBack }) {
       const blob = await res.blob();
       const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
       const fileName = `${productId}-Colour${v.variant_number}.${ext}`;
-      const url = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = blobUrl;
       a.download = fileName;
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      // small delay between downloads
-      await new Promise(r => setTimeout(r, 400));
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+      await new Promise(r => setTimeout(r, 600));
     } catch (err) {
-      toast(`Failed to download Colour ${v.variant_number}`, 'error');
+      toast(`Failed: Colour ${v.variant_number}`, 'error');
     }
   }
+  toast('Done! ✓', 'success');
+};
 
-  toast('Images saved! Now share from your gallery 📲', 'success');
+const handleShareSelected = async () => {
+  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
+
+  try {
+    toast('Preparing...', 'info');
+    const files = await Promise.all(
+      selected.map(async (v) => {
+        const imageUrl = getImageUrl(v.image_path);
+        const res = await fetch(imageUrl);
+        const blob = await res.blob();
+        const ext = imageUrl.split('.').pop().split('?')[0] || 'jpg';
+        return new File(
+          [blob],
+          `${productId}-Colour${v.variant_number}.${ext}`,
+          { type: blob.type }
+        );
+      })
+    );
+
+    if (navigator.canShare && navigator.canShare({ files })) {
+      await navigator.share({ files });
+      return;
+    }
+  } catch (err) {
+    console.error('Share failed:', err.message);
+  }
+
+  // Fallback — open images directly in new tabs (user can long-press save)
+  const selected2 = product.variants.filter(v => selectedVariants.includes(v.id));
+  for (const v of selected2) {
+    window.open(getImageUrl(v.image_path), '_blank');
+  }
+  toast('Long-press each image to save 💡', 'info');
 };
 
   const handleDownload = async (e, imageUrl) => {
@@ -227,27 +211,37 @@ export default function ProductPage({ productId, onBack }) {
           <>
             {/* Top bar: share selected + add variant */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-              
+             <div style={{ display: 'flex', gap: 8 }}>
+  {selectedVariants.length > 0 && (
+    <>
+      {/* Desktop: download */}
+      <button
+        className="btn btn-gold"
+        onClick={handleDownloadSelected}
+        style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'none' : 'flex' }}
+      >
+        ⬇ Download {selectedVariants.length}
+      </button>
 
-                {selectedVariants.length > 0 && (
-                  <button
-                    className="btn btn-gold"
-                    onClick={handleShareSelected}
-                  >
-                    ⬇ Download {selectedVariants.length} Selected
-                  </button>
-                )}
-                {selectedVariants.length > 0 && (
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => setSelectedVariants([])}
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    ✕ Clear
-                  </button>
-                )}
-              </div>
+      {/* Mobile: native share sheet */}
+      <button
+        className="btn btn-gold"
+        onClick={handleShareSelected}
+        style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'flex' : 'none' }}
+      >
+        ↗ Share {selectedVariants.length} Selected
+      </button>
+
+      <button
+        className="btn btn-outline"
+        onClick={() => setSelectedVariants([])}
+        style={{ fontSize: '0.8rem' }}
+      >
+        ✕ Clear
+      </button>
+    </>
+  )}
+</div>
               <button
                 className="btn btn-gold"
                 onClick={() => setShowAddVariant(true)}
