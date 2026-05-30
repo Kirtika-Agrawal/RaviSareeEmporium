@@ -52,21 +52,54 @@ export default function ProductPage({ productId, onBack }) {
     onBack();
   };
 
-  const handleShareSelected = () => {
-    const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-    const text = selected.map(v =>
-      `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
-    ).join('\n\n');
+  const handleShareSelected = async () => {
+  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
 
-    const message = `*${productId}* - Selected Colour Variants:\n\n${text}`;
+  // Try sharing actual image files
+  if (navigator.canShare) {
+    try {
+      // Fetch all selected images and convert to File objects
+      const files = await Promise.all(
+        selected.map(async (v) => {
+          const url = getImageUrl(v.image_path);
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const ext = url.split('.').pop().split('?')[0] || 'jpg';
+          return new File(
+            [blob],
+            `${productId}-Colour${v.variant_number}.${ext}`,
+            { type: blob.type }
+          );
+        })
+      );
 
-    if (navigator.share) {
-      navigator.share({ title: productId, text: message });
-    } else {
-      const encoded = encodeURIComponent(message);
-      window.open(`https://wa.me/?text=${encoded}`, '_blank');
+      // Check if browser supports sharing files
+      if (navigator.canShare({ files })) {
+        await navigator.share({
+          title: `${productId} - Selected Colour Variants`,
+          text: `${productId} - ${selected.length} colour variant${selected.length > 1 ? 's' : ''}`,
+          files,
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('File share failed, falling back to links:', err);
     }
-  };
+  }
+
+  // Fallback: share as text links (desktop or unsupported browsers)
+  const text = selected.map(v =>
+    `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
+  ).join('\n\n');
+  const message = `*${productId}* - Selected Colour Variants:\n\n${text}`;
+
+  if (navigator.share) {
+    navigator.share({ title: productId, text: message });
+  } else {
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+  }
+};
 
   const handleDownload = async (e, imageUrl) => {
     e.stopPropagation();
