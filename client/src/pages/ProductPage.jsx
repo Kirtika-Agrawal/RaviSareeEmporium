@@ -53,76 +53,62 @@ export default function ProductPage({ productId, onBack }) {
   };
 
   const handleShareSelected = async () => {
-  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
+    const selected = product.variants.filter(v => selectedVariants.includes(v.id));
 
-  if (navigator.canShare) {
-    try {
-      toast('Fetching images...', 'info');
-      
-      const files = await Promise.all(
-        selected.map(async (v) => {
-          const url = getImageUrl(v.image_path);
-          console.log('Fetching:', url);
-          const res = await fetch(url);
-          console.log('Response ok:', res.ok, 'Type:', res.type);
-          const blob = await res.blob();
-          console.log('Blob size:', blob.size, 'Blob type:', blob.type);
-          const ext = url.split('.').pop().split('?')[0] || 'jpg';
-          return new File(
-            [blob],
-            `${productId}-Colour${v.variant_number}.${ext}`,
-            { type: blob.type }
-          );
-        })
-      );
+    if (navigator.canShare) {
+      try {
+        toast('Fetching images...', 'info');
 
-      console.log('Files ready:', files);
-      console.log('canShare files?', navigator.canShare({ files }));
+        const files = await Promise.all(
+          selected.map(async (v) => {
+            const url = getImageUrl(v.image_path);
+            console.log('Fetching:', url);
+            const res = await fetch(url);
+            console.log('Response ok:', res.ok, 'Type:', res.type);
+            const blob = await res.blob();
+            console.log('Blob size:', blob.size, 'Blob type:', blob.type);
+            const ext = url.split('.').pop().split('?')[0] || 'jpg';
+            return new File(
+              [blob],
+              `${productId}-Colour${v.variant_number}.${ext}`,
+              { type: blob.type }
+            );
+          })
+        );
 
-      if (navigator.canShare({ files })) {
-        await navigator.share({
-          title: `${productId} - Selected Colour Variants`,
-          text: `${productId} - ${selected.length} colour variant${selected.length > 1 ? 's' : ''}`,
-          files,
-        });
-        return;
-      } else {
-        console.log('canShare returned false for files');
+        console.log('Files ready:', files);
+        console.log('canShare files?', navigator.canShare({ files }));
+
+        if (navigator.canShare({ files })) {
+          await navigator.share({
+            title: `${productId} - Selected Colour Variants`,
+            text: `${productId} - ${selected.length} colour variant${selected.length > 1 ? 's' : ''}`,
+            files,
+          });
+          return;
+        } else {
+          console.log('canShare returned false for files');
+        }
+      } catch (err) {
+        console.error('File share error:', err.name, err.message);
       }
-    } catch (err) {
-      console.error('File share error:', err.name, err.message);
+    } else {
+      console.log('navigator.canShare not available');
     }
-  } else {
-    console.log('navigator.canShare not available');
-  }
 
-  // Fallback
-  const text = selected.map(v =>
-    `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
-  ).join('\n\n');
-  const message = `*${productId}* - Selected Colour Variants:\n\n${text}`;
+    // Fallback: share as text links
+    const text = selected.map(v =>
+      `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
+    ).join('\n\n');
+    const message = `*${productId}* - Selected Colour Variants:\n\n${text}`;
 
-  if (navigator.share) {
-    navigator.share({ title: productId, text: message });
-  } else {
-    const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encoded}`, '_blank');
-  }
-};
-
-  // Fallback: share as text links (desktop or unsupported browsers)
-  const text = selected.map(v =>
-    `Colour ${v.variant_number}${v.description ? ' - ' + v.description : ''}:\n${getImageUrl(v.image_path)}`
-  ).join('\n\n');
-  const message = `*${productId}* - Selected Colour Variants:\n\n${text}`;
-
-  if (navigator.share) {
-    navigator.share({ title: productId, text: message });
-  } else {
-    const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encoded}`, '_blank');
-  }
-};
+    if (navigator.share) {
+      navigator.share({ title: productId, text: message });
+    } else {
+      const encoded = encodeURIComponent(message);
+      window.open(`https://wa.me/?text=${encoded}`, '_blank');
+    }
+  };
 
   const handleDownload = async (e, imageUrl) => {
     e.stopPropagation();
@@ -448,7 +434,6 @@ export default function ProductPage({ productId, onBack }) {
             padding: 20,
           }}
         >
-          {/* Close */}
           <button
             onClick={() => setViewImage(null)}
             style={{
@@ -460,7 +445,6 @@ export default function ProductPage({ productId, onBack }) {
             }}
           >✕</button>
 
-          {/* Download */}
           <button
             onClick={(e) => handleDownload(e, viewImage)}
             style={{
