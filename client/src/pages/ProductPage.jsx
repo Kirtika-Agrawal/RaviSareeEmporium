@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { fetchProduct, deleteVariant, deleteProduct, getImageUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import VariantModal from '../components/VariantModal';
@@ -15,6 +15,7 @@ export default function ProductPage({ productId, onBack }) {
   const [imgErrors, setImgErrors] = useState({});
   const [expandedDesc, setExpandedDesc] = useState({});
   const [selectedVariants, setSelectedVariants] = useState([]);
+  const [viewImage, setViewImage] = useState(null);
 
   const toggleSelect = (id) => {
     setSelectedVariants(prev =>
@@ -39,14 +40,16 @@ export default function ProductPage({ productId, onBack }) {
   const handleVariantSaved = () => { load(); };
 
   const handleDeleteVariant = async () => {
-    try {
-      await deleteVariant(deleteVariantTarget.id);
-      toast('Colour variant deleted');
-      setDeleteVariantTarget(null);
-      load();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    await deleteVariant(deleteVariantTarget.id);
+    toast('Colour variant deleted');
+    setDeleteVariantTarget(null);
+    load();
+  };
+
+  const handleDeleteProduct = async () => {
+    await deleteProduct(productId);
+    toast(`Product ${productId} deleted`);
+    onBack();
   };
 
   const handleShareSelected = () => {
@@ -65,13 +68,19 @@ export default function ProductPage({ productId, onBack }) {
     }
   };
 
-  const handleDeleteProduct = async () => {
+  const handleDownload = async (e, imageUrl) => {
+    e.stopPropagation();
     try {
-      await deleteProduct(productId);
-      toast(`Product ${productId} deleted`);
-      onBack();
-    } catch (err) {
-      toast(err.message, 'error');
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = imageUrl.split('/').pop();
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.open(imageUrl, '_blank');
     }
   };
 
@@ -81,7 +90,8 @@ export default function ProductPage({ productId, onBack }) {
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
-      {/* Header */}
+
+      {/* ── HEADER ── */}
       <header style={{
         background: 'linear-gradient(180deg, rgba(61,13,24,0.98) 0%, rgba(90,18,32,0.95) 100%)',
         borderBottom: '1px solid rgba(201,168,76,0.3)',
@@ -92,7 +102,6 @@ export default function ProductPage({ productId, onBack }) {
         backdropFilter: 'blur(10px)',
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          {/* Top row: back + title + delete */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <button
               className="btn btn-outline"
@@ -125,7 +134,6 @@ export default function ProductPage({ productId, onBack }) {
             </button>
           </div>
 
-          {/* Subtitle row */}
           {product && (
             <div style={{ textAlign: 'center' }}>
               <span style={{
@@ -141,8 +149,9 @@ export default function ProductPage({ productId, onBack }) {
         </div>
       </header>
 
+      {/* ── MAIN CONTENT ── */}
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
-        {/* Loading */}
+
         {loading && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
             <div className="spinner" />
@@ -151,41 +160,40 @@ export default function ProductPage({ productId, onBack }) {
 
         {!loading && product && (
           <>
-            {/* Add variant button */}
+            {/* Top bar: share selected + add variant */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div>
-              {selectedVariants.length > 0 && (
-                <button
-                  className="btn btn-gold"
-                  onClick={handleShareSelected}
-                  style={{ marginRight: 8 }}
-                >
-                  ↗ Share {selectedVariants.length} Selected
-                </button>
-              )}
-              {selectedVariants.length > 0 && (
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setSelectedVariants([])}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  ✕ Clear
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                {selectedVariants.length > 0 && (
+                  <button
+                    className="btn btn-gold"
+                    onClick={handleShareSelected}
+                  >
+                    ↗ Share {selectedVariants.length} Selected
+                  </button>
+                )}
+                {selectedVariants.length > 0 && (
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => setSelectedVariants([])}
+                    style={{ fontSize: '0.8rem' }}
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+              <button
+                className="btn btn-gold"
+                onClick={() => setShowAddVariant(true)}
+              >
+                <span>+</span> Add Colour Variant
+              </button>
             </div>
-            <button
-              className="btn btn-gold"
-              onClick={() => setShowAddVariant(true)}
-            >
-              <span>+</span> Add Colour Variant
-            </button>
-          </div>
 
             <div className="ornamental-divider">
               <span>❖ Colour Variants ❖</span>
             </div>
 
-            {/* Empty variants */}
+            {/* Empty state */}
             {product.variants.length === 0 && (
               <div className="empty-state fade-in">
                 <span className="emoji">🎨</span>
@@ -211,9 +219,10 @@ export default function ProductPage({ productId, onBack }) {
                     style={{
                       animationDelay: `${i * 0.06}s`,
                       overflow: 'hidden',
+                      position: 'relative',
                     }}
                   >
-                    {/* Variant label */}
+                    {/* ── Variant header: label + buttons ── */}
                     <div style={{
                       padding: '10px 16px 8px',
                       borderBottom: '1px solid rgba(201,168,76,0.2)',
@@ -221,63 +230,77 @@ export default function ProductPage({ productId, onBack }) {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                     }}>
-                      <div>
-                        <span style={{
-                          fontFamily: "'Playfair Display', serif",
-                          fontWeight: 700,
-                          color: 'var(--maroon)',
-                          fontSize: '0.95rem',
-                        }}>
-                          Colour {v.variant_number}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-  {/* ADD THIS */}
-  <div
-    onClick={() => toggleSelect(v.id)}
-    style={{
-      width: 28,
-      height: 28,
-      borderRadius: 6,
-      border: `2px solid ${selectedVariants.includes(v.id) ? 'var(--gold)' : 'rgba(201,168,76,0.4)'}`,
-      background: selectedVariants.includes(v.id) ? 'var(--gold)' : 'transparent',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      fontSize: '0.8rem',
-      color: 'var(--maroon)',
-      flexShrink: 0,
-    }}
-  >
-    {selectedVariants.includes(v.id) && '✓'}
-  </div>
+                      <span style={{
+                        fontFamily: "'Playfair Display', serif",
+                        fontWeight: 700,
+                        color: 'var(--maroon)',
+                        fontSize: '0.95rem',
+                      }}>
+                        Colour {v.variant_number}
+                      </span>
 
-  <button
-    className="btn btn-outline"
-    onClick={() => setEditVariant(v)}
-    style={{ padding: '5px 12px', fontSize: '0.75rem', color: 'var(--maroon)', borderColor: 'rgba(123,28,46,0.3)' }}
-  >
-    ✏ Edit
-  </button>
-  <button
-    className="btn"
-    onClick={() => setDeleteVariantTarget(v)}
-    style={{ background: 'none', color: '#c0392b', padding: '5px 10px', fontSize: '0.75rem' }}
-  >
-    🗑
-  </button>
-</div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {/* Checkbox */}
+                        <div
+                          onClick={() => toggleSelect(v.id)}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            border: `2px solid ${selectedVariants.includes(v.id) ? 'var(--gold)' : 'rgba(201,168,76,0.4)'}`,
+                            background: selectedVariants.includes(v.id) ? 'var(--gold)' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            fontSize: '0.8rem',
+                            color: 'var(--maroon)',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {selectedVariants.includes(v.id) && '✓'}
+                        </div>
+
+                        <button
+                          className="btn btn-outline"
+                          onClick={() => setEditVariant(v)}
+                          style={{
+                            padding: '5px 12px',
+                            fontSize: '0.75rem',
+                            color: 'var(--maroon)',
+                            borderColor: 'rgba(123,28,46,0.3)',
+                          }}
+                        >
+                          ✏ Edit
+                        </button>
+
+                        <button
+                          className="btn"
+                          onClick={() => setDeleteVariantTarget(v)}
+                          style={{
+                            background: 'none',
+                            color: '#c0392b',
+                            padding: '5px 10px',
+                            fontSize: '0.75rem',
+                          }}
+                        >
+                          🗑
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Image */}
-                    <div style={{
-                      width: '100%',
-                      aspectRatio: '3/4',
-                      background: 'linear-gradient(135deg, #e8d5b0, #d4b896)',
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}>
+                    {/* ── Image (clickable → fullscreen) ── */}
+                    <div
+                      style={{
+                        width: '100%',
+                        aspectRatio: '3/4',
+                        background: 'linear-gradient(135deg, #e8d5b0, #d4b896)',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        cursor: 'zoom-in',
+                      }}
+                      onClick={() => !imgErrors[v.id] && setViewImage(getImageUrl(v.image_path))}
+                    >
                       {!imgErrors[v.id] ? (
                         <img
                           src={getImageUrl(v.image_path)}
@@ -292,9 +315,23 @@ export default function ProductPage({ productId, onBack }) {
                           fontSize: '3rem',
                         }}>🥻</div>
                       )}
+
+                      {!imgErrors[v.id] && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 8, right: 8,
+                          background: 'rgba(0,0,0,0.5)',
+                          color: 'white',
+                          borderRadius: 6,
+                          padding: '3px 8px',
+                          fontSize: '0.7rem',
+                        }}>
+                          🔍 Tap to view
+                        </div>
+                      )}
                     </div>
 
-                    {/* Description */}
+                    {/* ── Description ── */}
                     <div style={{ padding: '12px 16px 16px' }}>
                       {v.description ? (
                         <>
@@ -340,7 +377,62 @@ export default function ProductPage({ productId, onBack }) {
         )}
       </div>
 
-      {/* Modals */}
+      {/* ── FULLSCREEN IMAGE VIEWER ── */}
+      {viewImage && (
+        <div
+          onClick={() => setViewImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.92)',
+            zIndex: 999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          {/* Close */}
+          <button
+            onClick={() => setViewImage(null)}
+            style={{
+              position: 'absolute', top: 16, right: 16,
+              background: 'rgba(201,168,76,0.15)',
+              border: '1px solid rgba(201,168,76,0.4)',
+              color: 'var(--gold)', borderRadius: '50%',
+              width: 40, height: 40, fontSize: '1.2rem', cursor: 'pointer',
+            }}
+          >✕</button>
+
+          {/* Download */}
+          <button
+            onClick={(e) => handleDownload(e, viewImage)}
+            style={{
+              position: 'absolute', top: 16, right: 64,
+              background: 'rgba(201,168,76,0.15)',
+              border: '1px solid rgba(201,168,76,0.4)',
+              color: 'var(--gold)', borderRadius: '50%',
+              width: 40, height: 40, fontSize: '1.2rem', cursor: 'pointer',
+            }}
+            title="Download image"
+          >⬇</button>
+
+          <img
+            src={viewImage}
+            alt="Full view"
+            style={{
+              maxWidth: '100%',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 12,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.8)',
+            }}
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+
+      {/* ── MODALS ── */}
       {showAddVariant && (
         <VariantModal
           productId={productId}
