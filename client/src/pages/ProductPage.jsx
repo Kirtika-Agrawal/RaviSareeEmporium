@@ -273,7 +273,7 @@ const handleShareSelected = async () => {
                     key={v.id}
                     className="card fade-in"
                     style={{
-                      animationDelay: `${i * 0.06}s`,
+                      animationDelay: `${Math.min(i, 12) * 0.06}s`,
                       overflow: 'hidden',
                       position: 'relative',
                     }}
@@ -361,6 +361,8 @@ const handleShareSelected = async () => {
                         <img
                           src={getImageUrl(v.image_path)}
                           alt={`Colour ${v.variant_number}`}
+                          loading="lazy"
+                          decoding="async"
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={() => setImgErrors(prev => ({ ...prev, [v.id]: true }))}
                         />

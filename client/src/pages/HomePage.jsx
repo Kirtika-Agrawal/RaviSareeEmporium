@@ -25,11 +25,10 @@ export default function HomePage({ onSelectProduct }) {
     }
   }, [toast]);
 
-  useEffect(() => { load(); }, [load]);
-
-  // Debounced search
+  // Handles both the initial load and search. Debounce only while typing, so
+  // the first paint isn't held back by 300ms.
   useEffect(() => {
-    const t = setTimeout(() => load(search), 300);
+    const t = setTimeout(() => load(search), search ? 300 : 0);
     return () => clearTimeout(t);
   }, [search, load]);
 
@@ -169,7 +168,7 @@ export default function HomePage({ onSelectProduct }) {
                 key={p.product_id}
                 className="card fade-in"
                 style={{
-                  animationDelay: `${i * 0.05}s`,
+                  animationDelay: `${Math.min(i, 12) * 0.05}s`,
                   cursor: 'pointer',
                   overflow: 'hidden',
                   position: 'relative',
@@ -188,6 +187,8 @@ export default function HomePage({ onSelectProduct }) {
                     <img
                       src={getImageUrl(p.first_image)}
                       alt={p.product_id}
+                      loading="lazy"
+                      decoding="async"
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={() => setImgErrors(prev => ({ ...prev, [p.product_id]: true }))}
                     />

@@ -84,25 +84,52 @@ const initDb = async () => {
       FOREIGN KEY (product_id) REFERENCES products(product_id)
     )
   `);
+  // Without this, every variant lookup is a full table scan. The catalogue
+  // query runs two of them per product, which is what burns the Turso row-read
+  // quota. variant_number is included so the "first variant" lookup is
+  // satisfied by the index alone.
+  await db.execute(`
+    CREATE INDEX IF NOT EXISTS idx_variants_product
+      ON variants (product_id, variant_number)
+  `);
   console.log('✅ Turso database ready');
 };
 
 const https = require('https');
 
-app.get('/api/image-proxy', async (req, res) => {
+// Exact hostnames only. A startsWith check on the bucket name would also match
+// hosts like `<bucket>.attacker.com`, turning this into an open proxy.
+const allowedImageHosts = new Set([
+  `${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com`,
+  `${BUCKET}.s3.amazonaws.com`,
+]);
+
+app.get('/api/image-proxy', (req, res) => {
   const { url } = req.query;
-  
-  // Security: only allow your own S3 bucket
-  if (!url || !url.startsWith(`https://${BUCKET}`)) {
+
+  let target;
+  try {
+    target = new URL(url);
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+  if (target.protocol !== 'https:' || !allowedImageHosts.has(target.hostname)) {
     return res.status(400).json({ error: 'Invalid URL' });
   }
 
-  https.get(url, (stream) => {
+  https.get(target, (stream) => {
+    if (stream.statusCode !== 200) {
+      stream.resume();
+      return res.status(502).json({ error: `Upstream returned ${stream.statusCode}` });
+    }
     res.setHeader('Content-Type', stream.headers['content-type'] || 'image/jpeg');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    // Upload keys are unique per file and never rewritten, so responses are
+    // safe to cache indefinitely.
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     stream.pipe(res);
   }).on('error', (err) => {
-    res.status(500).json({ error: err.message });
+    res.status(502).json({ error: err.message });
   });
 });
 
