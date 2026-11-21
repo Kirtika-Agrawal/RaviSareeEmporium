@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import VariantModal from '../components/VariantModal';
@@ -16,6 +16,8 @@ export default function ProductPage({ productId, onBack }) {
   const [expandedDesc, setExpandedDesc] = useState({});
   const [selectedVariants, setSelectedVariants] = useState([]);
   const [viewImage, setViewImage] = useState(null);
+
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [productId]);
 
   const toggleSelect = (id) => {
     setSelectedVariants(prev =>

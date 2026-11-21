@@ -1,23 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { fetchProducts, deleteProduct, getImageUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import AddProductModal from '../components/AddProductModal';
 import ConfirmModal from '../components/ConfirmModal';
 
+// Outlives HomePage while a product is open, so going back shows the same
+// list, search and scroll position immediately while a fresh copy loads.
+const homeCache = { products: null, search: '', scrollY: 0 };
+
 export default function HomePage({ onSelectProduct }) {
   const toast = useToast();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [products, setProducts] = useState(homeCache.products ?? []);
+  const [loading, setLoading] = useState(!homeCache.products);
+  const [search, setSearch] = useState(homeCache.search);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [imgErrors, setImgErrors] = useState({});
+
+  useLayoutEffect(() => {
+    if (homeCache.products) window.scrollTo(0, homeCache.scrollY);
+  }, []);
+
+  const openProduct = (productId) => {
+    homeCache.scrollY = window.scrollY;
+    onSelectProduct(productId);
+  };
 
   const load = useCallback(async (q = '') => {
     setLoading(true);
     try {
       const data = await fetchProducts(q);
       setProducts(data);
+      homeCache.products = data;
+      homeCache.search = q;
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -132,8 +147,8 @@ export default function HomePage({ onSelectProduct }) {
           <span>❖ Catalogue ❖</span>
         </div>
 
-        {/* Loading */}
-        {loading && (
+        {/* Loading — keep showing the current list while it refreshes */}
+        {loading && products.length === 0 && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
             <div className="spinner" />
           </div>
@@ -161,7 +176,7 @@ export default function HomePage({ onSelectProduct }) {
         )}
 
         {/* Grid */}
-        {!loading && products.length > 0 && (
+        {products.length > 0 && (
           <div className="products-grid">
             {products.map((p, i) => (
               <div
@@ -173,7 +188,7 @@ export default function HomePage({ onSelectProduct }) {
                   overflow: 'hidden',
                   position: 'relative',
                 }}
-                onClick={() => onSelectProduct(p.product_id)}
+                onClick={() => openProduct(p.product_id)}
               >
                 {/* Image */}
                 <div style={{
