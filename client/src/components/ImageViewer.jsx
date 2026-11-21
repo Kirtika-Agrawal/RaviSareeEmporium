@@ -1,11 +1,14 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { getImageUrl } from '../utils/api';
+import ZoomableImage from './ZoomableImage';
 
 export default function ImageViewer({ variants, startIndex, onClose, onDownload }) {
   const trackRef = useRef(null);
   const pushedHistory = useRef(false);
   const [index, setIndex] = useState(startIndex);
   const [failed, setFailed] = useState({});
+  // While zoomed, one-finger drags pan the photo instead of changing colour.
+  const [zoomed, setZoomed] = useState(false);
 
   // Jump straight to the tapped colour before the first paint.
   useLayoutEffect(() => {
@@ -22,9 +25,13 @@ export default function ImageViewer({ variants, startIndex, onClose, onDownload 
     }
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    // iOS Safari zooms the whole page on pinch unless its gesture event is blocked.
+    const blockPageZoom = (e) => e.preventDefault();
+    document.addEventListener('gesturestart', blockPageZoom);
     window.addEventListener('popstate', onClose);
     return () => {
       window.removeEventListener('popstate', onClose);
+      document.removeEventListener('gesturestart', blockPageZoom);
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
@@ -60,7 +67,11 @@ export default function ImageViewer({ variants, startIndex, onClose, onDownload 
 
   return (
     <div className="viewer" role="dialog" aria-modal="true">
-      <div className="viewer-track" ref={trackRef} onScroll={handleScroll}>
+      <div
+        className={`viewer-track${zoomed ? ' zoomed' : ''}`}
+        ref={trackRef}
+        onScroll={handleScroll}
+      >
         {variants.map((v, i) => (
           <div
             key={v.id}
@@ -70,18 +81,26 @@ export default function ImageViewer({ variants, startIndex, onClose, onDownload 
             {failed[v.id] ? (
               <div style={{ fontSize: '4rem' }}>🥻</div>
             ) : (
-              <img
+              <ZoomableImage
                 src={getImageUrl(v.image_path)}
                 alt={`Colour ${v.variant_number}`}
+                active={i === index}
                 loading={Math.abs(i - index) <= 1 ? 'eager' : 'lazy'}
-                decoding="async"
-                draggable={false}
+                onZoomChange={setZoomed}
+                onBackgroundClick={close}
                 onError={() => setFailed(prev => ({ ...prev, [v.id]: true }))}
               />
             )}
           </div>
         ))}
       </div>
+
+      {!zoomed && (
+        <p className="viewer-hint" style={{ bottom: hasMany ? 44 : 22 }}>
+          <span className="hint-touch">Pinch or double-tap to zoom</span>
+          <span className="hint-mouse">Double-click to zoom</span>
+        </p>
+      )}
 
       <div className="viewer-topbar">
         <span className="viewer-label">
