@@ -3,6 +3,7 @@ import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl } 
 import { useToast } from '../hooks/useToast';
 import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
+import ImageViewer from '../components/ImageViewer';
 
 export default function ProductPage({ productId, onBack }) {
   const toast = useToast();
@@ -15,7 +16,8 @@ export default function ProductPage({ productId, onBack }) {
   const [imgErrors, setImgErrors] = useState({});
   const [expandedDesc, setExpandedDesc] = useState({});
   const [selectedVariants, setSelectedVariants] = useState([]);
-  const [viewImage, setViewImage] = useState(null);
+  const [viewIndex, setViewIndex] = useState(null);
+  const closeViewer = useCallback(() => setViewIndex(null), []);
 
   useLayoutEffect(() => { window.scrollTo(0, 0); }, [productId]);
 
@@ -357,7 +359,7 @@ const handleShareSelected = async () => {
                         position: 'relative',
                         cursor: 'zoom-in',
                       }}
-                      onClick={() => !imgErrors[v.id] && setViewImage(getImageUrl(v.image_path))}
+                      onClick={() => !imgErrors[v.id] && setViewIndex(i)}
                     >
                       {!imgErrors[v.id] ? (
                         <img
@@ -437,57 +439,14 @@ const handleShareSelected = async () => {
         )}
       </div>
 
-      {/* ── FULLSCREEN IMAGE VIEWER ── */}
-      {viewImage && (
-        <div
-          onClick={() => setViewImage(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.92)',
-            zIndex: 999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-          }}
-        >
-          <button
-            onClick={() => setViewImage(null)}
-            style={{
-              position: 'absolute', top: 16, right: 16,
-              background: 'rgba(201,168,76,0.15)',
-              border: '1px solid rgba(201,168,76,0.4)',
-              color: 'var(--gold)', borderRadius: '50%',
-              width: 40, height: 40, fontSize: '1.2rem', cursor: 'pointer',
-            }}
-          >✕</button>
-
-          <button
-            onClick={(e) => handleDownload(e, viewImage)}
-            style={{
-              position: 'absolute', top: 16, right: 64,
-              background: 'rgba(201,168,76,0.15)',
-              border: '1px solid rgba(201,168,76,0.4)',
-              color: 'var(--gold)', borderRadius: '50%',
-              width: 40, height: 40, fontSize: '1.2rem', cursor: 'pointer',
-            }}
-            title="Download image"
-          >⬇</button>
-
-          <img
-            src={viewImage}
-            alt="Full view"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-              borderRadius: 12,
-              boxShadow: '0 8px 40px rgba(0,0,0,0.8)',
-            }}
-            onClick={e => e.stopPropagation()}
-          />
-        </div>
+      {/* ── FULLSCREEN IMAGE VIEWER (swipe between colours) ── */}
+      {viewIndex !== null && product && (
+        <ImageViewer
+          variants={product.variants}
+          startIndex={viewIndex}
+          onClose={closeViewer}
+          onDownload={handleDownload}
+        />
       )}
 
       {/* ── MODALS ── */}
