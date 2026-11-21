@@ -66,6 +66,16 @@ export async function deleteVariant(id) {
   return res.json();
 }
 
+export async function renameProduct(productId, newProductId) {
+  const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, {
+    method: 'PATCH',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_product_id: newProductId }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to rename product');
+  return res.json();
+}
+
 export async function deleteProduct(productId) {
   const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, {
     method: 'DELETE',

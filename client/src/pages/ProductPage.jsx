@@ -3,9 +3,10 @@ import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl } 
 import { useToast } from '../hooks/useToast';
 import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
+import RenameModal from '../components/RenameModal';
 import ImageViewer from '../components/ImageViewer';
 
-export default function ProductPage({ productId, onBack }) {
+export default function ProductPage({ productId, onBack, onRenamed }) {
   const toast = useToast();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,6 +18,8 @@ export default function ProductPage({ productId, onBack }) {
   const [expandedDesc, setExpandedDesc] = useState({});
   const [selectedVariants, setSelectedVariants] = useState([]);
   const [viewIndex, setViewIndex] = useState(null);
+  const [showRename, setShowRename] = useState(false);
+
   const closeViewer = useCallback(() => setViewIndex(null), []);
 
   useLayoutEffect(() => { window.scrollTo(0, 0); }, [productId]);
@@ -183,7 +186,7 @@ const handleShareSelected = async () => {
           </div>
 
           {product && (
-            <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
               <span style={{
                 fontFamily: "'Playfair Display', serif",
                 fontStyle: 'italic',
@@ -192,6 +195,14 @@ const handleShareSelected = async () => {
               }}>
                 {product.variants.length} colour variant{product.variants.length !== 1 ? 's' : ''}
               </span>
+              <button
+                className="btn btn-outline"
+                onClick={() => setShowRename(true)}
+                style={{ padding: '3px 10px', fontSize: '0.7rem' }}
+                title="Rename product ID"
+              >
+                ✏ Rename
+              </button>
             </div>
           )}
         </div>
@@ -450,6 +461,14 @@ const handleShareSelected = async () => {
       )}
 
       {/* ── MODALS ── */}
+      {showRename && (
+        <RenameModal
+          productId={productId}
+          onClose={() => setShowRename(false)}
+          onRenamed={onRenamed}
+        />
+      )}
+
       {showAddVariant && (
         <VariantModal
           productId={productId}

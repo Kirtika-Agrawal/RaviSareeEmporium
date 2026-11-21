@@ -38,10 +38,15 @@ export default function App() {
     }
   };
 
+  const handleRenamed = (newId) => {
+    window.history.replaceState(window.history.state, '', productPath(newId));
+    setSelectedProduct(newId);
+  };
+
   return (
     <ToastProvider>
       {selectedProduct ? (
-        <ProductPage productId={selectedProduct} onBack={goHome} />
+        <ProductPage productId={selectedProduct} onBack={goHome} onRenamed={handleRenamed} />
       ) : (
         <HomePage onSelectProduct={openProduct} />
       )}

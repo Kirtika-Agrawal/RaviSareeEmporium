@@ -355,6 +355,43 @@ app.delete('/api/variants/:id', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/products/:productId  { new_product_id }
+app.patch('/api/products/:productId', requireAuth, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const newId = (req.body.new_product_id || '').trim().toUpperCase();
+    if (!newId) return res.status(400).json({ error: 'New Product ID is required' });
+    if (newId === productId) return res.json({ product_id: newId });
+
+    const existing = await db.execute({
+      sql: 'SELECT product_id FROM products WHERE product_id IN (?, ?)',
+      args: [productId, newId]
+    });
+    const ids = existing.rows.map(r => r.product_id);
+    if (!ids.includes(productId)) return res.status(404).json({ error: 'Product not found' });
+    if (ids.includes(newId)) return res.status(409).json({ error: `Product ID "${newId}" already exists` });
+
+    // Insert-move-delete rather than updating the key in place, so the
+    // variants foreign key is valid at every step. created_at is carried over
+    // so the product keeps its position in the catalogue.
+    await db.batch([
+      {
+        sql: 'INSERT INTO products (product_id, created_at) SELECT ?, created_at FROM products WHERE product_id = ?',
+        args: [newId, productId]
+      },
+      { sql: 'UPDATE variants SET product_id = ? WHERE product_id = ?', args: [newId, productId] },
+      { sql: 'DELETE FROM products WHERE product_id = ?', args: [productId] },
+    ], 'write');
+
+    res.json({ product_id: newId });
+  } catch (err) {
+    if (/UNIQUE constraint/i.test(err.message)) {
+      return res.status(409).json({ error: 'That Product ID already exists' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/products/:productId
 app.delete('/api/products/:productId', requireAuth, async (req, res) => {
   try {
