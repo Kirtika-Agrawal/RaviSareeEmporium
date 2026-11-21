@@ -164,6 +164,11 @@ app.get('/', (req, res) => {
   res.send('🪷 Ravi Saree Emporium API is running!');
 });
 
+// GET /api/auth/check — lets the client verify the staff password up front
+app.get('/api/auth/check', requireAuth, (req, res) => {
+  res.json({ ok: true });
+});
+
 // GET /api/products
 app.get('/api/products', async (req, res) => {
   try {

@@ -11,8 +11,8 @@ export default function AddProductModal({ onClose, onSuccess }) {
   const [preview, setPreview] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Password gate
-  const [password, setPassword] = useState('');
+  // Password gate — skipped when staff mode already holds the password
+  const [password, setPassword] = useState(getAdminPassword);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
 

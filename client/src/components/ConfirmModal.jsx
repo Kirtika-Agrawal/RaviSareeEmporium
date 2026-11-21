@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { setAdminPassword, getAdminPassword } from '../utils/api';
 
 export default function ConfirmModal({ title, message, onConfirm, onCancel, confirmLabel = 'Delete', danger = true }) {
-  const [password, setPassword] = useState('');
+  // Skipped when staff mode already holds the password
+  const [password, setPassword] = useState(getAdminPassword);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
 

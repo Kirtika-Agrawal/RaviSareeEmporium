@@ -1,8 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { fetchProducts, deleteProduct, getImageUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
+import { useAdmin } from '../hooks/useAdmin';
 import AddProductModal from '../components/AddProductModal';
 import ConfirmModal from '../components/ConfirmModal';
+import StaffLoginModal from '../components/StaffLoginModal';
 
 // Outlives HomePage while a product is open, so going back shows the same
 // list, search and scroll position immediately while a fresh copy loads.
@@ -10,6 +12,8 @@ const homeCache = { products: null, search: '', scrollY: 0 };
 
 export default function HomePage({ onSelectProduct }) {
   const toast = useToast();
+  const { isAdmin, logout } = useAdmin();
+  const [showLogin, setShowLogin] = useState(false);
   const [products, setProducts] = useState(homeCache.products ?? []);
   const [loading, setLoading] = useState(!homeCache.products);
   const [search, setSearch] = useState(homeCache.search);
@@ -97,7 +101,7 @@ export default function HomePage({ onSelectProduct }) {
           letterSpacing: '0.15em',
           marginBottom: 16,
         }}>
-          Product Catalogue Manager
+          {isAdmin ? 'Product Catalogue Manager' : 'Product Catalogue'}
         </p>
 
         {/* Search */}
@@ -134,13 +138,25 @@ export default function HomePage({ onSelectProduct }) {
               </span>
             )}
           </div>
-          <button
-            className="btn btn-gold"
-            onClick={() => setShowAddModal(true)}
-            style={{ padding: '10px 18px' }}
-          >
-            <span style={{ fontSize: '1.1rem' }}>+</span> New Product
-          </button>
+          {isAdmin && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => { logout(); toast('Staff mode off'); }}
+                style={{ padding: '10px 14px' }}
+                title="Hide staff controls"
+              >
+                Exit Staff
+              </button>
+              <button
+                className="btn btn-gold"
+                onClick={() => setShowAddModal(true)}
+                style={{ padding: '10px 18px' }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>+</span> New Product
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="ornamental-divider">
@@ -161,9 +177,9 @@ export default function HomePage({ onSelectProduct }) {
             <h3>{search ? 'No products found' : 'No products yet'}</h3>
             <p>{search
               ? `No product ID matches "${search}"`
-              : 'Add your first product to get started!'
+              : isAdmin ? 'Add your first product to get started!' : 'New designs are coming soon.'
             }</p>
-            {!search && (
+            {!search && isAdmin && (
               <button
                 className="btn btn-gold"
                 onClick={() => setShowAddModal(true)}
@@ -251,27 +267,43 @@ export default function HomePage({ onSelectProduct }) {
                     }}>
                       View details →
                     </span>
-                    <button
-                      className="btn"
-                      onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
-                      style={{
-                        background: 'none',
-                        color: '#c0392b',
-                        padding: '4px 8px',
-                        fontSize: '0.75rem',
-                        borderRadius: 4,
-                      }}
-                      title="Delete product"
-                    >
-                      🗑
-                    </button>
+                    {isAdmin && (
+                      <button
+                        className="btn"
+                        onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
+                        style={{
+                          background: 'none',
+                          color: '#c0392b',
+                          padding: '4px 8px',
+                          fontSize: '0.75rem',
+                          borderRadius: 4,
+                        }}
+                        title="Delete product"
+                      >
+                        🗑
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )}
+
+        {!isAdmin && (
+          <div style={{ textAlign: 'center', marginTop: 48 }}>
+            <button
+              className="btn"
+              onClick={() => setShowLogin(true)}
+              style={{ background: 'none', color: 'rgba(201,168,76,0.45)', fontSize: '0.75rem' }}
+            >
+              🔒 Staff login
+            </button>
+          </div>
+        )}
       </div>
+
+      {showLogin && <StaffLoginModal onClose={() => setShowLogin(false)} />}
 
       {showAddModal && (
         <AddProductModal

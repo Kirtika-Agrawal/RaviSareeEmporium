@@ -7,8 +7,8 @@ export default function VariantModal({ productId, variant, onClose, onSuccess })
   const isEdit = !!variant;
   const fileInputRef = useRef(null);
 
-  // Password gate
-  const [password, setPassword] = useState('');
+  // Password gate — skipped when staff mode already holds the password
+  const [password, setPassword] = useState(getAdminPassword);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
 

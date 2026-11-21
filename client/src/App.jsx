@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ToastProvider } from './hooks/useToast';
+import { AdminProvider } from './hooks/useAdmin';
 import HomePage from './pages/HomePage';
 import ProductPage from './pages/ProductPage';
 
@@ -45,11 +46,13 @@ export default function App() {
 
   return (
     <ToastProvider>
-      {selectedProduct ? (
-        <ProductPage productId={selectedProduct} onBack={goHome} onRenamed={handleRenamed} />
-      ) : (
-        <HomePage onSelectProduct={openProduct} />
-      )}
+      <AdminProvider>
+        {selectedProduct ? (
+          <ProductPage productId={selectedProduct} onBack={goHome} onRenamed={handleRenamed} />
+        ) : (
+          <HomePage onSelectProduct={openProduct} />
+        )}
+      </AdminProvider>
     </ToastProvider>
   );
 }

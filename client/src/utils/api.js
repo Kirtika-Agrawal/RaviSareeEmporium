@@ -22,6 +22,13 @@ export const getAdminPassword = () => {
   return sessionStorage.getItem('adminPassword') || '';
 };
 
+export async function checkAdminPassword(password) {
+  const res = await fetch(`${BASE}/auth/check`, {
+    headers: { 'x-admin-password': password },
+  });
+  return res.ok;
+}
+
 // Add this header to all write requests
 const authHeader = () => ({
   'x-admin-password': getAdminPassword()

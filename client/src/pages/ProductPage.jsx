@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
 import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl } from '../utils/api';
 import { useToast } from '../hooks/useToast';
+import { useAdmin } from '../hooks/useAdmin';
 import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
 import RenameModal from '../components/RenameModal';
@@ -8,6 +9,7 @@ import ImageViewer from '../components/ImageViewer';
 
 export default function ProductPage({ productId, onBack, onRenamed }) {
   const toast = useToast();
+  const { isAdmin } = useAdmin();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAddVariant, setShowAddVariant] = useState(false);
@@ -153,15 +155,17 @@ const handleShareSelected = async () => {
         backdropFilter: 'blur(10px)',
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+          {/* Side columns share the leftover width, so the ID stays centred
+              whether or not the Delete button is shown. */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <button
               className="btn btn-outline"
               onClick={onBack}
-              style={{ padding: '8px 14px', fontSize: '0.8rem', flexShrink: 0 }}
+              style={{ padding: '8px 14px', fontSize: '0.8rem', justifySelf: 'start' }}
             >
               ← Back
             </button>
-            <div style={{ flex: 1, textAlign: 'center' }}>
+            <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: 'rgba(201,168,76,0.5)', letterSpacing: '0.2em', marginBottom: 2 }}>
                 PRODUCT ID
               </div>
@@ -175,14 +179,16 @@ const handleShareSelected = async () => {
                 {productId}
               </h1>
             </div>
-            <button
-              className="btn btn-danger"
-              onClick={() => setShowDeleteProduct(true)}
-              style={{ padding: '8px 12px', fontSize: '0.75rem', flexShrink: 0 }}
-              title="Delete entire product"
-            >
-              🗑 Delete
-            </button>
+            {isAdmin ? (
+              <button
+                className="btn btn-danger"
+                onClick={() => setShowDeleteProduct(true)}
+                style={{ padding: '8px 12px', fontSize: '0.75rem', justifySelf: 'end' }}
+                title="Delete entire product"
+              >
+                🗑 Delete
+              </button>
+            ) : <span />}
           </div>
 
           {product && (
@@ -195,14 +201,16 @@ const handleShareSelected = async () => {
               }}>
                 {product.variants.length} colour variant{product.variants.length !== 1 ? 's' : ''}
               </span>
-              <button
-                className="btn btn-outline"
-                onClick={() => setShowRename(true)}
-                style={{ padding: '3px 10px', fontSize: '0.7rem' }}
-                title="Rename product ID"
-              >
-                ✏ Rename
-              </button>
+              {isAdmin && (
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setShowRename(true)}
+                  style={{ padding: '3px 10px', fontSize: '0.7rem' }}
+                  title="Rename product ID"
+                >
+                  ✏ Rename
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -252,12 +260,14 @@ const handleShareSelected = async () => {
     </>
   )}
 </div>
-              <button
-                className="btn btn-gold"
-                onClick={() => setShowAddVariant(true)}
-              >
-                <span>+</span> Add Colour Variant
-              </button>
+              {isAdmin && (
+                <button
+                  className="btn btn-gold"
+                  onClick={() => setShowAddVariant(true)}
+                >
+                  <span>+</span> Add Colour Variant
+                </button>
+              )}
             </div>
 
             <div className="ornamental-divider">
@@ -269,14 +279,16 @@ const handleShareSelected = async () => {
               <div className="empty-state fade-in">
                 <span className="emoji">🎨</span>
                 <h3>No colour variants yet</h3>
-                <p>Add your first colour variant for {productId}</p>
-                <button
-                  className="btn btn-gold"
-                  onClick={() => setShowAddVariant(true)}
-                  style={{ marginTop: 20 }}
-                >
-                  + Add First Colour
-                </button>
+                <p>{isAdmin ? `Add your first colour variant for ${productId}` : 'Photos are coming soon.'}</p>
+                {isAdmin && (
+                  <button
+                    className="btn btn-gold"
+                    onClick={() => setShowAddVariant(true)}
+                    style={{ marginTop: 20 }}
+                  >
+                    + Add First Colour
+                  </button>
+                )}
               </div>
             )}
 
@@ -332,31 +344,35 @@ const handleShareSelected = async () => {
                           {selectedVariants.includes(v.id) && '✓'}
                         </div>
 
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => setEditVariant(v)}
-                          style={{
-                            padding: '5px 12px',
-                            fontSize: '0.75rem',
-                            color: 'var(--maroon)',
-                            borderColor: 'rgba(123,28,46,0.3)',
-                          }}
-                        >
-                          ✏ Edit
-                        </button>
+                        {isAdmin && (
+                          <>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => setEditVariant(v)}
+                              style={{
+                                padding: '5px 12px',
+                                fontSize: '0.75rem',
+                                color: 'var(--maroon)',
+                                borderColor: 'rgba(123,28,46,0.3)',
+                              }}
+                            >
+                              ✏ Edit
+                            </button>
 
-                        <button
-                          className="btn"
-                          onClick={() => setDeleteVariantTarget(v)}
-                          style={{
-                            background: 'none',
-                            color: '#c0392b',
-                            padding: '5px 10px',
-                            fontSize: '0.75rem',
-                          }}
-                        >
-                          🗑
-                        </button>
+                            <button
+                              className="btn"
+                              onClick={() => setDeleteVariantTarget(v)}
+                              style={{
+                                background: 'none',
+                                color: '#c0392b',
+                                padding: '5px 10px',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              🗑
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
