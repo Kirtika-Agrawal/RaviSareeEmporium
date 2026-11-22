@@ -1,6 +1,6 @@
 {
   "images": {
-    "sizes": [640],
+    "sizes": [480],
     "minimumCacheTTL": 86400,
     "remotePatterns": [
       { "protocol": "https", "hostname": "ravi-saree-emporium.s3.ap-south-1.amazonaws.com" }
@@ -22,18 +22,6 @@
       ],
       "missing": [{ "type": "query", "key": "app" }],
       "destination": "/api/link-preview?id=:id"
-    },
-    {
-      "source": "/",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|Pinterestbot|SkypeUriPreview|Viber).*"
-        }
-      ],
-      "missing": [{ "type": "query", "key": "app" }],
-      "destination": "/api/link-preview"
     },
     {
       "source": "/(.*)",

@@ -25,10 +25,11 @@ async function getJson(url) {
   }
 }
 
-// Original photos run to several MB, and WhatsApp drops preview images that
-// big, so point at a resized copy from Vercel's image service instead.
+// Original photos run to several MB, and WhatsApp drops preview images over
+// roughly 300 KB, so point at a resized copy from Vercel's image service.
+// The width must be listed in "images.sizes" in vercel.json.
 const previewImage = (origin, imageUrl) => (imageUrl && imageUrl.startsWith('https://')
-  ? `${origin}/_vercel/image?url=${encodeURIComponent(imageUrl)}&w=640&q=75`
+  ? `${origin}/_vercel/image?url=${encodeURIComponent(imageUrl)}&w=480&q=75`
   : null);
 
 const text = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
