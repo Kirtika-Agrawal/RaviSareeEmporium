@@ -118,6 +118,34 @@ h1, h2, h3 {
 
 .search-input::placeholder { color: #a8998e; }
 
+.search-box.with-photo .search-input { padding-right: 52px; }
+
+.search-photo {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.search-photo:hover { background: var(--brand-dark); }
+
+.search-box .search-photo svg {
+  position: static;
+  transform: none;
+  stroke: #fff;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
 .search-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(184, 145, 58, 0.15);
@@ -1340,6 +1368,58 @@ h1, h2, h3 {
   margin-top: 10px;
   font-size: 0.85rem;
   text-align: center;
+}
+
+/* Find by photo */
+.identify-page { max-width: 560px; }
+
+.identify-intro {
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.identify-note {
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  background: rgba(184, 145, 58, 0.12);
+  color: var(--ink);
+}
+
+.identify-find {
+  width: 100%;
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.identify-results img {
+  width: 56px;
+  height: 74px;
+}
+
+.identify-rank {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--brand);
+  border: 1.5px solid var(--brand);
+}
+
+.identify-results li:first-child .identify-rank {
+  background: var(--brand);
+  color: #fff;
+}
+
+.identify-open {
+  font-size: 1.5rem;
+  color: var(--muted);
 }
 
 .menu-item.active {

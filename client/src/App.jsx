@@ -6,12 +6,13 @@ import ProductPage from './pages/ProductPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import StatsPage from './pages/StatsPage';
+import IdentifyPage from './pages/IdentifyPage';
 import SideMenu from './components/SideMenu';
 import { parseRoute, productPath, categoryPath, currentPath } from './utils/routes';
 import { renameRecent } from './utils/recent';
 import { shop } from './shop';
 
-const PAGE_TITLES = { about: 'About', contact: 'Contact', stats: 'Stats' };
+const PAGE_TITLES = { about: 'About', contact: 'Contact', stats: 'Stats', identify: 'Find by photo' };
 
 export default function App() {
   const [route, setRoute] = useState(() => parseRoute());
@@ -89,11 +90,15 @@ export default function App() {
         {route.page === 'stats' && (
           <StatsPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
         )}
+        {route.page === 'identify' && (
+          <IdentifyPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
+        )}
         {route.page === 'home' && (
           <HomePage
             category={route.category}
             onCategoryChange={setHomeCategory}
             onSelectProduct={id => navigate(productPath(id))}
+            onFindByPhoto={() => navigate('/identify')}
             onMenu={openMenu}
           />
         )}

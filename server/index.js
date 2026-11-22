@@ -5,6 +5,7 @@ const multerS3 = require('multer-s3');
 const path = require('path');
 const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { createClient } = require('@libsql/client');
+const { createPhotoMatcher } = require('./photo_match');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,11 +61,22 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+// Photos sent to "Find by photo" are only compared, never stored.
+const uploadToMemory = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (/^image\//.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Please send a photo'));
+  },
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
+
 // ── TURSO DATABASE SETUP ──────────────────────────────────────────────────────
 const db = createClient({
   url: process.env.TURSO_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
+const photoMatcher = createPhotoMatcher(db);
 
 const initDb = async () => {
   await db.execute(`
@@ -109,6 +121,7 @@ const initDb = async () => {
       PRIMARY KEY (product_id, day)
     )
   `);
+  await photoMatcher.init();
   console.log('✅ Turso database ready');
 };
 
@@ -288,6 +301,7 @@ app.post('/api/products', requireAuth, upload.single('image'), async (req, res) 
       sql: 'INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, 1, ?, ?)',
       args: [pid, imageUrl, description || '']
     });
+    photoMatcher.indexPending();
 
     const newProduct = await db.execute({
       sql: `SELECT ${PRODUCT_LIST_COLUMNS} FROM products p WHERE p.product_id = ?`,
@@ -331,6 +345,7 @@ app.post('/api/variants', requireAuth, upload.single('image'), async (req, res) 
       sql: 'INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, ?, ?, ?)',
       args: [pid, nextVariantNum, imageUrl, description || '']
     });
+    photoMatcher.indexPending();
     const newVariant = await db.execute({
       sql: 'SELECT * FROM variants WHERE id = ?',
       args: [result.lastInsertRowid]
@@ -367,6 +382,7 @@ app.put('/api/variants/:id', requireAuth, upload.single('image'), async (req, re
       sql: 'UPDATE variants SET image_path = ?, description = ? WHERE id = ?',
       args: [newImageUrl, description !== undefined ? description : variant.description, id]
     });
+    if (req.file) photoMatcher.indexPending();
     const updated = await db.execute({
       sql: 'SELECT * FROM variants WHERE id = ?',
       args: [id]
@@ -389,6 +405,7 @@ app.delete('/api/variants/:id', requireAuth, async (req, res) => {
     if (variantResult.rows.length === 0) return res.status(404).json({ error: 'Variant not found' });
 
     await deleteFromS3(variantResult.rows[0].image_path);
+    await photoMatcher.forgetVariants('id = ?', [id]);
     await db.execute({ sql: 'DELETE FROM variants WHERE id = ?', args: [id] });
     res.json({ success: true });
   } catch (err) {
@@ -483,6 +500,7 @@ app.delete('/api/products/:productId', requireAuth, async (req, res) => {
       await deleteFromS3(v.image_path);
     }
 
+    await photoMatcher.forgetVariants('product_id = ?', [productId]);
     await db.execute({ sql: 'DELETE FROM variants WHERE product_id = ?', args: [productId] });
     await db.execute({ sql: 'DELETE FROM product_stats WHERE product_id = ?', args: [productId] });
     await db.execute({ sql: 'DELETE FROM products WHERE product_id = ?', args: [productId] });
@@ -556,10 +574,43 @@ app.get('/api/stats', requireAuth, async (req, res) => {
   }
 });
 
+// ── FIND BY PHOTO ─────────────────────────────────────────────────────────────
+
+// GET /api/identify/status — how much of the catalogue can be matched yet
+app.get('/api/identify/status', requireAuth, async (req, res) => {
+  try {
+    res.json(await photoMatcher.status());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/identify  (multipart: photo, hint?) — closest catalogue designs
+app.post('/api/identify', requireAuth, (req, res) => {
+  uploadToMemory.single('photo')(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    if (!req.file) return res.status(400).json({ error: 'Please send a photo' });
+    if (!photoMatcher.isConfigured()) {
+      return res.status(503).json({ error: 'Find by photo is not switched on yet' });
+    }
+    try {
+      const matches = await photoMatcher.findMatches(req.file.buffer, req.body.hint);
+      res.json({ matches, ...(await photoMatcher.status()) });
+    } catch (err) {
+      if (err instanceof photoMatcher.QuotaError) {
+        return res.status(503).json({ error: "Today's photo matching limit is used up. Please try again in a few hours." });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+});
+
 // ── START SERVER ──────────────────────────────────────────────────────────────
 initDb().then(() => {
   app.listen(PORT, () => {
     console.log(`🪷 Ravi Saree Emporium Server running on http://localhost:${PORT}`);
+    photoMatcher.indexPending();
+    setInterval(() => photoMatcher.indexPending(), 30 * 60 * 1000);
   });
 }).catch(err => {
   console.error('Failed to initialize database:', err);

@@ -41,7 +41,7 @@ function SelectionBar({ count, total, onSelectAll, onCancel, onSetCategory }) {
   );
 }
 
-export default function HomePage({ category, onCategoryChange, onSelectProduct, onMenu }) {
+export default function HomePage({ category, onCategoryChange, onSelectProduct, onFindByPhoto, onMenu }) {
   const toast = useToast();
   const { isAdmin, logout } = useAdmin();
   const [products, setProducts] = useState(homeCache.products ?? []);
@@ -162,7 +162,7 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
           <div className="home-menu"><MenuButton onClick={onMenu} /></div>
         </div>
 
-        <div className="search-box">
+        <div className={`search-box${isAdmin ? ' with-photo' : ''}`}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input
             className="search-input"
@@ -170,6 +170,13 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
             value={search}
             onChange={e => setSearch(e.target.value.toUpperCase())}
           />
+          {isAdmin && (
+            <button className="search-photo" onClick={onFindByPhoto} aria-label="Find design by photo" title="Find design by photo">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 8h4l2-3h6l2 3h4v12H3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+              </svg>
+            </button>
+          )}
         </div>
       </header>
 

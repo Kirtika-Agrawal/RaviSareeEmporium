@@ -119,6 +119,22 @@ export async function fetchStats(days) {
   return res.json();
 }
 
+export async function fetchIdentifyStatus() {
+  const res = await fetch(`${BASE}/identify/status`, { headers: authHeader() });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to load status');
+  return res.json();
+}
+
+// Returns { matches: [{ product_id, variant_number, image_path, category }], indexed, total }
+export async function identifyPhoto(photo, hint) {
+  const formData = new FormData();
+  formData.append('photo', photo, 'photo.jpg');
+  if (hint) formData.append('hint', hint);
+  const res = await fetch(`${BASE}/identify`, { method: 'POST', headers: authHeader(), body: formData });
+  if (!res.ok) throw new Error((await res.json()).error || 'Could not match the photo');
+  return res.json();
+}
+
 export async function deleteProduct(productId) {
   const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, {
     method: 'DELETE',
