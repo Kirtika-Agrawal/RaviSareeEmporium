@@ -376,9 +376,9 @@ const handleShareSelected = async () => {
 
       {deleteVariantTarget && (
         <ConfirmModal
-          title="Delete Colour Variant?"
-          message={`This will permanently delete Colour ${deleteVariantTarget.variant_number} of ${productId}. This cannot be undone.`}
-          confirmLabel="Delete Variant"
+          title={`Delete Colour ${deleteVariantTarget.variant_number}?`}
+          message={`This permanently deletes colour ${deleteVariantTarget.variant_number} of design ${productId} and its photo. This cannot be undone.`}
+          confirmLabel="Delete Colour"
           onConfirm={handleDeleteVariant}
           onCancel={() => setDeleteVariantTarget(null)}
         />
@@ -386,9 +386,9 @@ const handleShareSelected = async () => {
 
       {showDeleteProduct && (
         <ConfirmModal
-          title="Delete Entire Product?"
-          message={`This will permanently delete "${productId}" along with ALL its colour variants and images. This cannot be undone.`}
-          confirmLabel="Delete Product"
+          title={`Delete Design ${productId}?`}
+          message="This permanently deletes the design with all its colours and photos. This cannot be undone."
+          confirmLabel="Delete Design"
           onConfirm={handleDeleteProduct}
           onCancel={() => setShowDeleteProduct(false)}
         />

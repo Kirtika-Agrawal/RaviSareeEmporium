@@ -101,7 +101,7 @@ export default function HomePage({ onSelectProduct }) {
                 Exit Staff
               </button>
               <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)}>
-                + New Product
+                + New Design
               </button>
             </div>
           )}
@@ -190,9 +190,9 @@ export default function HomePage({ onSelectProduct }) {
 
       {deleteTarget && (
         <ConfirmModal
-          title="Delete Product?"
-          message={`This will permanently delete "${deleteTarget.product_id}" and all its ${deleteTarget.variant_count} colour variant(s). This cannot be undone.`}
-          confirmLabel="Delete Product"
+          title={`Delete Design ${deleteTarget.product_id}?`}
+          message={`This permanently deletes the design with its ${deleteTarget.variant_count} colour${deleteTarget.variant_count === 1 ? '' : 's'} and photos. This cannot be undone.`}
+          confirmLabel="Delete Design"
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />

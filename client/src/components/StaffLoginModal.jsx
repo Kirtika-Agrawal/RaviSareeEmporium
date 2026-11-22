@@ -32,40 +32,27 @@ export default function StaffLoginModal({ onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-        <h2 style={{
-          fontFamily: "'Playfair Display', serif",
-          color: 'var(--gold)',
-          fontSize: '1.5rem',
-          marginBottom: 6,
-          textAlign: 'center',
-        }}>
-          Staff Login
-        </h2>
-        <div className="ornament" style={{ marginBottom: 20 }}>❧ ✦ ❧</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ color: 'rgba(250,243,224,0.6)', textAlign: 'center', fontSize: '0.9rem' }}>
-            🔒 Enter the admin password to add, edit, rename or delete designs
+        <div className="modal-head">
+          <h2 className="modal-title">Staff Login</h2>
+        </div>
+        <div className="modal-form">
+          <p className="modal-text">
+            Enter the staff password to add, edit, rename or delete designs.
           </p>
           <input
             className="input"
             type="password"
-            placeholder="Enter password"
+            placeholder="Password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             autoFocus
           />
-          {error && (
-            <p style={{ color: '#e74c3c', fontSize: '0.8rem', textAlign: 'center' }}>
-              {error}
-            </p>
-          )}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button className="btn btn-outline" onClick={onClose} style={{ flex: 1 }}>
-              Cancel
-            </button>
-            <button className="btn btn-gold" onClick={handleSubmit} disabled={loading} style={{ flex: 2 }}>
-              {loading ? <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} /> : '🔓'}
+          {error && <p className="form-error">{error}</p>}
+          <div className="modal-actions">
+            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
+              {loading && <span className="spinner spinner-sm" />}
               {loading ? 'Checking...' : 'Log In'}
             </button>
           </div>
