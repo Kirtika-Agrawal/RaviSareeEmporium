@@ -42,7 +42,7 @@ export function EnquiryBar({ message, label }) {
         <a className="btn btn-wa" href={whatsappLink(message)} target="_blank" rel="noopener noreferrer">
           <WhatsAppIcon size={18} /> {label}
         </a>
-        <a className="btn btn-outline btn-call" href={callLink}>Call</a>
+        <a className="btn btn-secondary btn-call" href={callLink}>Call</a>
       </div>
     </div>
   );

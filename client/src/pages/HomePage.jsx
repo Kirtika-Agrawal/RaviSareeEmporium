@@ -69,100 +69,42 @@ export default function HomePage({ onSelectProduct }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', padding: '0 0 80px' }}>
-      {/* Header */}
-      <header style={{
-        background: 'linear-gradient(180deg, rgba(61, 13, 24, 0.98) 0%, rgba(90, 18, 32, 0.95) 100%)',
-        borderBottom: '1px solid rgba(201,168,76,0.3)',
-        padding: '28px 20px 20px',
-        textAlign: 'center',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        backdropFilter: 'blur(10px)',
-      }}>
-        <div className="ornament" style={{ fontSize: '0.75rem', letterSpacing: '0.8em', marginBottom: 6 }}>
-          ✦ ✦ ✦
-        </div>
-        <h1 style={{
-          fontFamily: "'Playfair Display', serif",
-          fontSize: 'clamp(1.4rem, 5vw, 2.2rem)',
-          color: 'var(--gold)',
-          letterSpacing: '0.04em',
-          textShadow: '0 2px 12px rgba(201,168,76,0.4)',
-          lineHeight: 1.2,
-          marginBottom: 2,
-        }}>
-          Ravi Saree Emporium
-        </h1>
-        <p style={{
-          fontFamily: "'Playfair Display', serif",
-          fontStyle: 'italic',
-          color: 'rgba(201,168,76,0.6)',
-          fontSize: '0.85rem',
-          letterSpacing: '0.15em',
-          marginBottom: 16,
-        }}>
-          {isAdmin ? 'Product Catalogue Manager' : 'Product Catalogue'}
-        </p>
+    <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
+      <header className="page-header" style={{ padding: '22px 16px 16px', textAlign: 'center' }}>
+        <h1 className="brand-title">Ravi Saree Emporium</h1>
+        <p className="brand-sub">{isAdmin ? 'Catalogue manager' : 'Saree collection'}</p>
 
-        {/* Search */}
-        <div style={{ maxWidth: 480, margin: '0 auto', position: 'relative' }}>
-          <span style={{
-            position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
-            color: 'rgba(201,168,76,0.5)', fontSize: '1rem',
-          }}>🔍</span>
+        <div className="search-box">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
           <input
-            className="input"
-            style={{ paddingLeft: 42, fontSize: '1rem' }}
-            placeholder="Search by Product ID..."
+            className="search-input"
+            placeholder="Search by design number"
             value={search}
             onChange={e => setSearch(e.target.value.toUpperCase())}
           />
         </div>
       </header>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
-        {/* Stats bar */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 20,
-        }}>
-          <div>
-            <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: '0.85rem' }}>
-              {products.length} {products.length === 1 ? 'Product' : 'Products'}
-            </span>
-            {search && (
-              <span style={{ color: 'rgba(250,243,224,0.4)', fontSize: '0.8rem', marginLeft: 8 }}>
-                matching "{search}"
-              </span>
-            )}
-          </div>
+      <div className="page-body">
+        <div className="toolbar">
+          <span className="muted">
+            {products.length} {products.length === 1 ? 'design' : 'designs'}
+            {search && ` matching "${search}"`}
+          </span>
           {isAdmin && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
-                className="btn btn-outline"
+                className="btn btn-ghost btn-sm"
                 onClick={() => { logout(); toast('Staff mode off'); }}
-                style={{ padding: '10px 14px' }}
                 title="Hide staff controls"
               >
                 Exit Staff
               </button>
-              <button
-                className="btn btn-gold"
-                onClick={() => setShowAddModal(true)}
-                style={{ padding: '10px 18px' }}
-              >
-                <span style={{ fontSize: '1.1rem' }}>+</span> New Product
+              <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)}>
+                + New Product
               </button>
             </div>
           )}
-        </div>
-
-        <div className="ornamental-divider">
-          <span>❖ Catalogue ❖</span>
         </div>
 
         {/* Loading — keep showing the current list while it refreshes */}
@@ -172,136 +114,66 @@ export default function HomePage({ onSelectProduct }) {
           </div>
         )}
 
-        {/* Empty */}
         {!loading && products.length === 0 && (
           <div className="empty-state fade-in">
             <span className="emoji">🥻</span>
-            <h3>{search ? 'No products found' : 'No products yet'}</h3>
+            <h3>{search ? 'No designs found' : 'No designs yet'}</h3>
             <p>{search
-              ? `No product ID matches "${search}"`
+              ? `No design number matches "${search}"`
               : isAdmin ? 'Add your first product to get started!' : 'New designs are coming soon.'
             }</p>
             {!search && isAdmin && (
-              <button
-                className="btn btn-gold"
-                onClick={() => setShowAddModal(true)}
-                style={{ marginTop: 20 }}
-              >
+              <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginTop: 20 }}>
                 + Add First Product
               </button>
             )}
           </div>
         )}
 
-        {/* Grid */}
         {products.length > 0 && (
           <div className="products-grid">
             {products.map((p, i) => (
               <div
                 key={p.product_id}
                 className="card fade-in"
-                style={{
-                  animationDelay: `${Math.min(i, 12) * 0.05}s`,
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}
+                style={{ animationDelay: `${Math.min(i, 12) * 0.05}s` }}
                 onClick={() => openProduct(p.product_id)}
               >
-                {/* Image */}
-                <div style={{
-                  width: '100%',
-                  aspectRatio: '3/4',
-                  background: 'linear-gradient(135deg, #e8d5b0, #d4b896)',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}>
+                <div className="card-photo">
                   {p.first_image && !imgErrors[p.product_id] ? (
                     <img
                       src={getImageUrl(p.first_image)}
-                      alt={p.product_id}
+                      alt={`Design ${p.product_id}`}
                       loading="lazy"
                       decoding="async"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onError={() => setImgErrors(prev => ({ ...prev, [p.product_id]: true }))}
                     />
                   ) : (
-                    <div style={{
-                      width: '100%', height: '100%',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '3rem',
-                    }}>🥻</div>
+                    <div className="fallback">🥻</div>
                   )}
-                  {/* Variant badge */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 8, right: 8,
-                    background: 'rgba(61,13,24,0.88)',
-                    border: '1px solid var(--gold)',
-                    color: 'var(--gold)',
-                    fontSize: '0.7rem',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: 20,
-                    letterSpacing: '0.05em',
-                  }}>
-                    {p.variant_count} colour{p.variant_count !== 1 ? 's' : ''}
-                  </div>
+                  {isAdmin && (
+                    <button
+                      className="photo-action"
+                      onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
+                      title="Delete product"
+                    >
+                      🗑
+                    </button>
+                  )}
                 </div>
-
-                {/* Card info */}
-                <div style={{ padding: '12px 14px 14px' }}>
-                  <h3 style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: 'var(--maroon)',
-                    letterSpacing: '0.08em',
-                    marginBottom: 6,
-                  }}>
-                    {p.product_id}
-                  </h3>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      fontSize: '0.75rem',
-                      color: 'var(--text-medium)',
-                      fontStyle: 'italic',
-                    }}>
-                      View details →
-                    </span>
-                    {isAdmin && (
-                      <button
-                        className="btn"
-                        onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
-                        style={{
-                          background: 'none',
-                          color: '#c0392b',
-                          padding: '4px 8px',
-                          fontSize: '0.75rem',
-                          borderRadius: 4,
-                        }}
-                        title="Delete product"
-                      >
-                        🗑
-                      </button>
-                    )}
-                  </div>
-                </div>
+                <h3 className="card-title">{p.product_id}</h3>
+                <p className="card-meta">
+                  {p.variant_count} colour{p.variant_count !== 1 ? 's' : ''}
+                </p>
               </div>
             ))}
           </div>
         )}
 
         {!isAdmin && (
-          <div style={{ textAlign: 'center', marginTop: 48 }}>
-            <button
-              className="btn"
-              onClick={() => setShowLogin(true)}
-              style={{ background: 'none', color: 'rgba(201,168,76,0.45)', fontSize: '0.75rem' }}
-            >
-              🔒 Staff login
-            </button>
-          </div>
+          <button className="staff-link" onClick={() => setShowLogin(true)}>
+            Staff login
+          </button>
         )}
       </div>
 

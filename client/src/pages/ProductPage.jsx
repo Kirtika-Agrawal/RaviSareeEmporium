@@ -151,79 +151,34 @@ const handleShareSelected = async () => {
     <div style={{ minHeight: '100vh', paddingBottom: hasWhatsApp ? 120 : 80 }}>
 
       {/* ── HEADER ── */}
-      <header style={{
-        background: 'linear-gradient(180deg, rgba(61,13,24,0.98) 0%, rgba(90,18,32,0.95) 100%)',
-        borderBottom: '1px solid rgba(201,168,76,0.3)',
-        padding: '16px 20px',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        backdropFilter: 'blur(10px)',
-      }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          {/* Side columns share the leftover width, so the ID stays centred
-              whether or not the Delete button is shown. */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-            <button
-              className="btn btn-outline"
-              onClick={onBack}
-              style={{ padding: '8px 14px', fontSize: '0.8rem', justifySelf: 'start' }}
-            >
-              ← Back
-            </button>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: 'rgba(201,168,76,0.5)', letterSpacing: '0.2em', marginBottom: 2 }}>
-                PRODUCT ID
-              </div>
-              <h1 style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: 'clamp(1.2rem, 4vw, 1.8rem)',
-                color: 'var(--gold)',
-                letterSpacing: '0.1em',
-                textShadow: '0 2px 10px rgba(201,168,76,0.4)',
-              }}>
-                {productId}
-              </h1>
-            </div>
-            {isAdmin ? (
-              <button
-                className="btn btn-danger"
-                onClick={() => setShowDeleteProduct(true)}
-                style={{ padding: '8px 12px', fontSize: '0.75rem', justifySelf: 'end' }}
-                title="Delete entire product"
-              >
-                🗑 Delete
-              </button>
-            ) : <span />}
+      <header className="page-header" style={{ padding: '12px 16px' }}>
+        {/* Side columns share the leftover width, so the ID stays centred
+            whether or not the Delete button is shown. */}
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12 }}>
+          <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ justifySelf: 'start' }}>
+            ← Back
+          </button>
+          <div style={{ textAlign: 'center' }}>
+            <div className="brand-sub" style={{ marginTop: 0 }}>Design</div>
+            <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', color: 'var(--brand)', lineHeight: 1.1, letterSpacing: '0.03em' }}>
+              {productId}
+            </h1>
           </div>
-
-          {product && (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10 }}>
-              <span style={{
-                fontFamily: "'Playfair Display', serif",
-                fontStyle: 'italic',
-                color: 'rgba(201,168,76,0.55)',
-                fontSize: '0.85rem',
-              }}>
-                {product.variants.length} colour variant{product.variants.length !== 1 ? 's' : ''}
-              </span>
-              {isAdmin && (
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setShowRename(true)}
-                  style={{ padding: '3px 10px', fontSize: '0.7rem' }}
-                  title="Rename product ID"
-                >
-                  ✏ Rename
-                </button>
-              )}
-            </div>
-          )}
+          {isAdmin ? (
+            <button
+              className="btn btn-danger-text btn-sm"
+              onClick={() => setShowDeleteProduct(true)}
+              style={{ justifySelf: 'end' }}
+              title="Delete entire product"
+            >
+              🗑 Delete
+            </button>
+          ) : <span />}
         </div>
       </header>
 
       {/* ── MAIN CONTENT ── */}
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 16px' }}>
+      <div className="page-body">
 
         {loading && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
@@ -233,51 +188,48 @@ const handleShareSelected = async () => {
 
         {!loading && product && (
           <>
-            {/* Top bar: share selected + add variant */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-             <div style={{ display: 'flex', gap: 8 }}>
-  {selectedVariants.length > 0 && (
-    <>
-      {/* Desktop: download */}
-      <button
-        className="btn btn-gold"
-        onClick={handleDownloadSelected}
-        style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'none' : 'flex' }}
-      >
-        ⬇ Download {selectedVariants.length}
-      </button>
+            {/* Toolbar: colour count, or actions for the selected colours */}
+            <div className="toolbar">
+              {selectedVariants.length > 0 ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {/* Desktop: download */}
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleDownloadSelected}
+                    style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'none' : 'flex' }}
+                  >
+                    ⬇ Download {selectedVariants.length}
+                  </button>
 
-      {/* Mobile: native share sheet */}
-      <button
-        className="btn btn-gold"
-        onClick={handleShareSelected}
-        style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'flex' : 'none' }}
-      >
-        ↗ Share {selectedVariants.length} Selected
-      </button>
+                  {/* Mobile: native share sheet */}
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleShareSelected}
+                    style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'flex' : 'none' }}
+                  >
+                    ↗ Share {selectedVariants.length}
+                  </button>
 
-      <button
-        className="btn btn-outline"
-        onClick={() => setSelectedVariants([])}
-        style={{ fontSize: '0.8rem' }}
-      >
-        ✕ Clear
-      </button>
-    </>
-  )}
-</div>
-              {isAdmin && (
-                <button
-                  className="btn btn-gold"
-                  onClick={() => setShowAddVariant(true)}
-                >
-                  <span>+</span> Add Colour Variant
-                </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedVariants([])}>
+                    ✕ Clear
+                  </button>
+                </div>
+              ) : (
+                <span className="muted">
+                  {product.variants.length} colour{product.variants.length !== 1 ? 's' : ''}
+                  {product.variants.length > 0 && ' · tap a photo to see it full screen'}
+                </span>
               )}
-            </div>
-
-            <div className="ornamental-divider">
-              <span>❖ Colour Variants ❖</span>
+              {isAdmin && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowRename(true)} title="Rename product ID">
+                    ✏ Rename
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowAddVariant(true)}>
+                    + Add Colour
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Empty state */}
@@ -288,7 +240,7 @@ const handleShareSelected = async () => {
                 <p>{isAdmin ? `Add your first colour variant for ${productId}` : 'Photos are coming soon.'}</p>
                 {isAdmin && (
                   <button
-                    className="btn btn-gold"
+                    className="btn btn-primary"
                     onClick={() => setShowAddVariant(true)}
                     style={{ marginTop: 20 }}
                   >
@@ -305,93 +257,11 @@ const handleShareSelected = async () => {
                   <div
                     key={v.id}
                     className="card fade-in"
-                    style={{
-                      animationDelay: `${Math.min(i, 12) * 0.06}s`,
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}
+                    style={{ animationDelay: `${Math.min(i, 12) * 0.06}s`, cursor: 'default' }}
                   >
-                    {/* ── Variant header: label + buttons ── */}
-                    <div style={{
-                      padding: '10px 16px 8px',
-                      borderBottom: '1px solid rgba(201,168,76,0.2)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}>
-                      <span style={{
-                        fontFamily: "'Playfair Display', serif",
-                        fontWeight: 700,
-                        color: 'var(--maroon)',
-                        fontSize: '0.95rem',
-                      }}>
-                        Colour {v.variant_number}
-                      </span>
-
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        {/* Checkbox */}
-                        <div
-                          onClick={() => toggleSelect(v.id)}
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 6,
-                            border: `2px solid ${selectedVariants.includes(v.id) ? 'var(--gold)' : 'rgba(201,168,76,0.4)'}`,
-                            background: selectedVariants.includes(v.id) ? 'var(--gold)' : 'transparent',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            color: 'var(--maroon)',
-                            flexShrink: 0,
-                          }}
-                        >
-                          {selectedVariants.includes(v.id) && '✓'}
-                        </div>
-
-                        {isAdmin && (
-                          <>
-                            <button
-                              className="btn btn-outline"
-                              onClick={() => setEditVariant(v)}
-                              style={{
-                                padding: '5px 12px',
-                                fontSize: '0.75rem',
-                                color: 'var(--maroon)',
-                                borderColor: 'rgba(123,28,46,0.3)',
-                              }}
-                            >
-                              ✏ Edit
-                            </button>
-
-                            <button
-                              className="btn"
-                              onClick={() => setDeleteVariantTarget(v)}
-                              style={{
-                                background: 'none',
-                                color: '#c0392b',
-                                padding: '5px 10px',
-                                fontSize: '0.75rem',
-                              }}
-                            >
-                              🗑
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ── Image (clickable → fullscreen) ── */}
                     <div
-                      style={{
-                        width: '100%',
-                        aspectRatio: '3/4',
-                        background: 'linear-gradient(135deg, #e8d5b0, #d4b896)',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        cursor: 'zoom-in',
-                      }}
+                      className="card-photo"
+                      style={{ cursor: imgErrors[v.id] ? 'default' : 'zoom-in' }}
                       onClick={() => !imgErrors[v.id] && setViewIndex(i)}
                     >
                       {!imgErrors[v.id] ? (
@@ -400,70 +270,56 @@ const handleShareSelected = async () => {
                           alt={`Colour ${v.variant_number}`}
                           loading="lazy"
                           decoding="async"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={() => setImgErrors(prev => ({ ...prev, [v.id]: true }))}
                         />
                       ) : (
-                        <div style={{
-                          width: '100%', height: '100%',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '3rem',
-                        }}>🥻</div>
+                        <div className="fallback">🥻</div>
                       )}
+                    </div>
 
-                      {!imgErrors[v.id] && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 8, right: 8,
-                          background: 'rgba(0,0,0,0.5)',
-                          color: 'white',
-                          borderRadius: 6,
-                          padding: '3px 8px',
-                          fontSize: '0.7rem',
+                    <div className="card-row" style={{ marginTop: 10 }}>
+                      <h3 className="card-title" style={{ marginTop: 0 }}>Colour {v.variant_number}</h3>
+                      <button
+                        className={`select-toggle${selectedVariants.includes(v.id) ? ' on' : ''}`}
+                        onClick={() => toggleSelect(v.id)}
+                        aria-pressed={selectedVariants.includes(v.id)}
+                      >
+                        {selectedVariants.includes(v.id) ? '✓ Selected' : 'Select'}
+                      </button>
+                    </div>
+
+                    {v.description && (
+                      <>
+                        <p className="card-desc" style={{
+                          display: expandedDesc[v.id] ? 'block' : '-webkit-box',
+                          WebkitLineClamp: expandedDesc[v.id] ? 'none' : 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: expandedDesc[v.id] ? 'visible' : 'hidden',
                         }}>
-                          🔍 Tap to view
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ── Description ── */}
-                    <div style={{ padding: '12px 16px 16px' }}>
-                      {v.description ? (
-                        <>
-                          <p style={{
-                            fontSize: '0.85rem',
-                            color: 'var(--text-medium)',
-                            lineHeight: 1.5,
-                            display: expandedDesc[v.id] ? 'block' : '-webkit-box',
-                            WebkitLineClamp: expandedDesc[v.id] ? 'none' : 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: expandedDesc[v.id] ? 'visible' : 'hidden',
-                          }}>
-                            {v.description}
-                          </p>
-                          {v.description.length > 80 && (
-                            <button
-                              onClick={() => toggleDesc(v.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--maroon)',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                padding: '4px 0',
-                              }}
-                            >
-                              {expandedDesc[v.id] ? 'Show less ▲' : 'Read more ▼'}
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-light)', fontStyle: 'italic' }}>
-                          No description
+                          {v.description}
                         </p>
-                      )}
-                    </div>
+                        {v.description.length > 80 && (
+                          <button className="link-btn" onClick={() => toggleDesc(v.id)}>
+                            {expandedDesc[v.id] ? 'Show less ▲' : 'Read more ▼'}
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {isAdmin && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setEditVariant(v)}>
+                          ✏ Edit
+                        </button>
+                        <button
+                          className="btn btn-danger-text btn-sm"
+                          onClick={() => setDeleteVariantTarget(v)}
+                          title="Delete colour"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
