@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl, trackEvent, trackView } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import { useAdmin } from '../hooks/useAdmin';
@@ -11,6 +11,15 @@ import TrashIcon from '../components/TrashIcon';
 import { EnquiryBar } from '../components/WhatsApp';
 import { hasWhatsApp, designEnquiry } from '../utils/whatsapp';
 import { addRecent, removeRecent } from '../utils/recent';
+
+const IMAGE_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+
+// Chrome rejects shares above these limits
+const MAX_SHARE_FILES = 10;
+const MAX_SHARE_BYTES = 50 * 1024 * 1024;
+
+// Browsers allow about 5 seconds between the tap and opening the share sheet
+const SHARE_TAP_WINDOW_MS = 4500;
 
 export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
   const toast = useToast();
@@ -26,6 +35,10 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
   const [selectedVariants, setSelectedVariants] = useState([]);
   const [viewIndex, setViewIndex] = useState(null);
   const [showEditDetails, setShowEditDetails] = useState(false);
+  const [shareState, setShareState] = useState('idle'); // 'idle' | 'preparing' | 'ready'
+  const photoCache = useRef(new Map());
+
+  useEffect(() => { setShareState('idle'); }, [selectedVariants]);
 
   const closeViewer = useCallback(() => setViewIndex(null), []);
 
@@ -87,32 +100,81 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
     toast(`Downloaded ${files.length} photo${files.length > 1 ? 's' : ''}`, 'success');
   };
 
+  const loadPhoto = (v) => {
+    const cache = photoCache.current;
+    const fileName = `${productId}-Colour${v.variant_number}`;
+    const key = `${fileName}:${v.image_path}`;
+    if (!cache.has(key)) {
+      const ext = (getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg').toLowerCase();
+      const promise = fetch(getProxyUrl(v.image_path))
+        .then(res => {
+          if (!res.ok) throw new Error();
+          return res.blob();
+        })
+        // Stored photos are served as application/octet-stream, which browsers refuse to share
+        .then(blob => new File([blob], `${fileName}.${ext}`, { type: IMAGE_TYPES[ext] || blob.type }))
+        .catch(() => {
+          cache.delete(key);
+          throw new Error(`Colour ${v.variant_number}`);
+        });
+      cache.set(key, promise);
+    }
+    return cache.get(key);
+  };
+
   const handleShareSelected = async () => {
+    const tappedAt = Date.now();
     const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-    toast('Preparing...', 'info');
+    if (selected.length > MAX_SHARE_FILES) {
+      toast(`You can share up to ${MAX_SHARE_FILES} photos at a time`, 'error');
+      return;
+    }
+
+    setShareState('preparing');
     let files;
     try {
-      files = await Promise.all(selected.map(async (v) => {
-        const res = await fetch(getProxyUrl(v.image_path));
-        if (!res.ok) throw new Error(`Colour ${v.variant_number}`);
-        const blob = await res.blob();
-        const ext = getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg';
-        return new File([blob], `${productId}-Colour${v.variant_number}.${ext}`, { type: blob.type });
-      }));
+      files = await Promise.all(selected.map(loadPhoto));
     } catch (err) {
+      setShareState('idle');
       toast(`Couldn't load ${err.message}, please try again`, 'error');
       return;
     }
 
-    if (navigator.canShare?.({ files })) {
-      try {
-        await navigator.share({ files });
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-      }
+    if (!navigator.canShare?.({ files })) {
+      setShareState('idle');
+      toast("This browser can't share photos, so they're being downloaded", 'info');
+      downloadFiles(files);
+      return;
     }
-    downloadFiles(files);
+    if (files.reduce((sum, f) => sum + f.size, 0) > MAX_SHARE_BYTES) {
+      setShareState('idle');
+      toast('These photos are too big to share together, try fewer colours', 'error');
+      return;
+    }
+
+    // The share sheet only opens within a few seconds of a tap. If the photos took
+    // longer to arrive, they are cached now and the next tap shares instantly.
+    const tapStillCounts = navigator.userActivation
+      ? navigator.userActivation.isActive
+      : Date.now() - tappedAt < SHARE_TAP_WINDOW_MS;
+    if (!tapStillCounts) {
+      setShareState('ready');
+      toast('Photos ready, tap Share again', 'info');
+      return;
+    }
+
+    setShareState('idle');
+    try {
+      await navigator.share({ files });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      if (err.name === 'NotAllowedError') {
+        setShareState('ready');
+        toast('Photos ready, tap Share again', 'info');
+        return;
+      }
+      toast("Couldn't open sharing, please try again", 'error');
+    }
   };
 
   const handleDownload = async (e, imageUrl) => {
@@ -173,8 +235,12 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
             <div className="toolbar">
               {selectedVariants.length > 0 ? (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn-secondary btn-sm" onClick={handleShareSelected}>
-                    ↗ Share {selectedVariants.length}
+                  <button
+                    className={`btn btn-sm ${shareState === 'ready' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={handleShareSelected}
+                    disabled={shareState === 'preparing'}
+                  >
+                    {shareState === 'preparing' ? 'Preparing...' : `↗ Share ${selectedVariants.length}`}
                   </button>
 
                   <button className="btn btn-ghost btn-sm" onClick={() => setSelectedVariants([])}>
