@@ -8,7 +8,6 @@ import { knownCategoryCounts, rememberCategoryCounts } from '../utils/categories
 import { hasWhatsApp, whatsappLink, callLink, generalEnquiry } from '../utils/whatsapp';
 import { shop } from '../shop';
 import { WhatsAppIcon } from './WhatsApp';
-import StaffLoginModal from './StaffLoginModal';
 
 const ICONS = {
   home: 'M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10',
@@ -16,7 +15,6 @@ const ICONS = {
   pin: 'M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z',
   share: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
-  lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   tag: 'M3 12.5V4h8.5L21 13.5 13.5 21 3 12.5zM7.5 8v.01',
 };
@@ -38,9 +36,8 @@ export function MenuButton({ onClick }) {
 }
 
 export default function SideMenu({ open, route, onClose, navigate }) {
-  const { isAdmin, logout } = useAdmin();
+  const { isAdmin } = useAdmin();
   const toast = useToast();
-  const [showLogin, setShowLogin] = useState(false);
   const [recent, setRecent] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brokenImages, setBrokenImages] = useState({});
@@ -179,20 +176,7 @@ export default function SideMenu({ open, route, onClose, navigate }) {
           </section>
         </div>
 
-        <div className="side-menu-foot">
-          {isAdmin ? (
-            <button className="menu-staff" onClick={() => { logout(); toast('Staff mode off'); onClose(); }}>
-              <Icon name="lock" /> Exit staff mode
-            </button>
-          ) : (
-            <button className="menu-staff" onClick={() => { onClose(); setShowLogin(true); }}>
-              <Icon name="lock" /> Staff login
-            </button>
-          )}
-        </div>
       </aside>
-
-      {showLogin && <StaffLoginModal onClose={() => setShowLogin(false)} />}
     </>
   );
 }

@@ -6,6 +6,7 @@ import AddProductModal from '../components/AddProductModal';
 import ConfirmModal from '../components/ConfirmModal';
 import BulkCategoryModal from '../components/BulkCategoryModal';
 import TrashIcon from '../components/TrashIcon';
+import StaffLoginModal from '../components/StaffLoginModal';
 import { MenuButton } from '../components/SideMenu';
 import { WhatsAppFab, useReserveBottom } from '../components/WhatsApp';
 import { hasWhatsApp, generalEnquiry } from '../utils/whatsapp';
@@ -53,6 +54,7 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
   const [selected, setSelected] = useState([]);
   const [showBulk, setShowBulk] = useState(false);
   const [untaggedOnly, setUntaggedOnly] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   // Leaving staff mode drops staff-only views without needing a reset.
   const selectMode = isAdmin && selecting;
   const untagged = isAdmin && untaggedOnly;
@@ -116,6 +118,12 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
     if (category) onCategoryChange(null);
   };
 
+  const toggleStaff = () => {
+    if (!isAdmin) return setShowLogin(true);
+    logout();
+    toast('Staff mode off');
+  };
+
   const toggleSelected = (id) => {
     setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
   };
@@ -137,6 +145,18 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
         <div className="home-header-inner">
           <h1 className="brand-title">Ravi Saree Emporium</h1>
           <p className="brand-sub">{isAdmin ? 'Catalogue manager' : 'Saree collection'}</p>
+          <div className="home-staff">
+            <button
+              className={`menu-btn staff-btn${isAdmin ? ' on' : ''}`}
+              onClick={toggleStaff}
+              aria-label={isAdmin ? 'Exit staff mode' : 'Staff login'}
+              title={isAdmin ? 'Exit staff mode' : 'Staff login'}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d={isAdmin ? 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 7.6-1.7' : 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4'} />
+              </svg>
+            </button>
+          </div>
           <div className="home-menu"><MenuButton onClick={onMenu} /></div>
         </div>
 
@@ -191,13 +211,6 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
           </span>
           {isAdmin && !selectMode && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => { logout(); toast('Staff mode off'); }}
-                title="Hide staff controls"
-              >
-                Exit Staff
-              </button>
               {visible.length > 0 && (
                 <button
                   className="btn btn-secondary btn-sm"
@@ -313,6 +326,8 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
       ) : (
         hasWhatsApp && <WhatsAppFab message={generalEnquiry} />
       )}
+
+      {showLogin && <StaffLoginModal onClose={() => setShowLogin(false)} />}
 
       {showBulk && (
         <BulkCategoryModal
