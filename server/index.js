@@ -3,7 +3,7 @@ const cors = require('cors');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
-const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, DeleteObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { createClient } = require('@libsql/client');
 const { createPhotoMatcher } = require('./photo_match');
 
@@ -61,7 +61,8 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
-// Photos sent to "Find by photo" are only compared, never stored.
+// "Find by photo" searches are only compared, never stored. A photo is kept
+// only when staff confirm which design it was.
 const uploadToMemory = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
@@ -600,6 +601,36 @@ app.post('/api/identify', requireAuth, (req, res) => {
       if (err instanceof photoMatcher.QuotaError) {
         return res.status(503).json({ error: "Today's photo matching limit is used up. Please try again in a few hours." });
       }
+      res.status(500).json({ error: err.message });
+    }
+  });
+});
+
+// POST /api/identify/feedback  (multipart: photo, product_id, suggested, hint?)
+// Staff say which design a searched photo really was.
+app.post('/api/identify/feedback', requireAuth, (req, res) => {
+  uploadToMemory.single('photo')(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+    try {
+      const productId = String(req.body.product_id || '').trim().toUpperCase();
+      let suggested = [];
+      try { suggested = JSON.parse(req.body.suggested || '[]').map(String).slice(0, 10); } catch { /* treat as none shown */ }
+      const product = await db.execute({ sql: 'SELECT product_id FROM products WHERE product_id = ?', args: [productId] });
+      if (product.rows.length === 0) return res.status(404).json({ error: `There's no design ${productId || 'with that number'}` });
+
+      let photoPath = null;
+      if (req.file) {
+        const key = `returns/${Date.now()}-${Math.round(Math.random() * 1e9)}.jpg`;
+        try {
+          await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: req.file.buffer, ContentType: req.file.mimetype }));
+          photoPath = key;
+        } catch (err) {
+          console.error('Return photo upload failed:', err.message);
+        }
+      }
+      await photoMatcher.recordFeedback({ productId, suggested, hint: String(req.body.hint || '').slice(0, 200), photoPath });
+      res.json(await photoMatcher.status());
+    } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });

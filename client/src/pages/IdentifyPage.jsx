@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect } from 'react';
 import PageHeader from '../components/PageHeader';
 import StaffLoginModal from '../components/StaffLoginModal';
 import ImageUpload from '../components/ImageUpload';
-import { fetchIdentifyStatus, identifyPhoto, getImageUrl } from '../utils/api';
+import { fetchIdentifyStatus, identifyPhoto, sendIdentifyFeedback, getImageUrl } from '../utils/api';
 import { shrinkPhoto } from '../utils/photo';
 import { useAdmin } from '../hooks/useAdmin';
 
@@ -16,6 +16,10 @@ export default function IdentifyPage({ onBack, onMenu, onSelectProduct }) {
   const [matching, setMatching] = useState(false);
   const [matches, setMatches] = useState(null);
   const [error, setError] = useState('');
+  const [searched, setSearched] = useState(null); // { photo, hint } behind the current matches
+  const [feedback, setFeedback] = useState('idle'); // 'idle' | 'other' | 'saving' | 'saved'
+  const [otherId, setOtherId] = useState('');
+  const [savedId, setSavedId] = useState('');
 
   useLayoutEffect(() => { window.scrollTo(0, 0); }, []);
 
@@ -39,9 +43,14 @@ export default function IdentifyPage({ onBack, onMenu, onSelectProduct }) {
     setMatching(true);
     setError('');
     try {
-      const result = await identifyPhoto(await shrinkPhoto(file), hint.trim());
-      setMatches(result.matches);
-      setStatus(s => ({ ...s, indexed: result.indexed, total: result.total }));
+      const photo = await shrinkPhoto(file);
+      const result = await identifyPhoto(photo, hint.trim());
+      const { matches: found, ...latestStatus } = result;
+      setMatches(found);
+      setStatus(latestStatus);
+      setSearched({ photo, hint: hint.trim() });
+      setFeedback('idle');
+      setOtherId('');
     } catch (err) {
       if (err.message === 'Unauthorized') logout();
       else setError(err.message);
@@ -50,7 +59,26 @@ export default function IdentifyPage({ onBack, onMenu, onSelectProduct }) {
     }
   };
 
+  const saveFeedback = async (productId) => {
+    const id = productId.trim().toUpperCase();
+    if (!id) return;
+    setFeedback('saving');
+    setError('');
+    try {
+      const latestStatus = await sendIdentifyFeedback(searched.photo, id, matches.map(m => m.product_id), searched.hint);
+      setStatus(latestStatus);
+      setSavedId(id);
+      setFeedback('saved');
+    } catch (err) {
+      if (err.message === 'Unauthorized') logout();
+      setError(err.message);
+      setFeedback(matches.some(m => m.product_id === id) ? 'idle' : 'other');
+    }
+  };
+
   const stillIndexing = status?.configured && status.indexed < status.total;
+  const addingCloseups = status?.configured && !stillIndexing && status.closeups < status.closeupsTotal;
+  const checked = status?.feedback?.checked || 0;
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 60 }}>
@@ -78,6 +106,18 @@ export default function IdentifyPage({ onBack, onMenu, onSelectProduct }) {
               <p className="identify-note">
                 Still learning the catalogue: {status.indexed.toLocaleString()} of {status.total.toLocaleString()} photos
                 done. Designs that aren't learned yet won't show up in matches.
+              </p>
+            )}
+            {addingCloseups && (
+              <p className="identify-note">
+                Every design can be matched. Close-ups of the fabric and border are still being added
+                ({status.closeups.toLocaleString()} of {status.closeupsTotal.toLocaleString()}), which helps with photos of folded sarees.
+              </p>
+            )}
+            {checked > 0 && (
+              <p className="identify-accuracy">
+                So far the right design was in the top 5 for <strong>{status.feedback.top} of {checked}</strong> checked
+                photo{checked === 1 ? '' : 's'}, and first for {status.feedback.first}.
               </p>
             )}
 
@@ -135,6 +175,53 @@ export default function IdentifyPage({ onBack, onMenu, onSelectProduct }) {
                   ))}
                 </ol>
                 <p className="field-hint">Ranked by how closely each design's photos match. Tap one to compare all its colours.</p>
+
+                <div className="identify-feedback">
+                  {feedback === 'saved' ? (
+                    <p className="identify-thanks">
+                      ✓ Saved as design {savedId}. Thanks, this keeps track of how accurate matching is.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="label">Which one was it?</p>
+                      <div className="chip-row chip-row-wrap">
+                        {matches.map(m => (
+                          <button
+                            key={m.product_id}
+                            className="chip"
+                            onClick={() => saveFeedback(m.product_id)}
+                            disabled={feedback === 'saving'}
+                          >
+                            {m.product_id}
+                          </button>
+                        ))}
+                        <button
+                          className={`chip ${feedback === 'other' ? 'active' : ''}`}
+                          onClick={() => setFeedback('other')}
+                          disabled={feedback === 'saving'}
+                        >
+                          Not listed
+                        </button>
+                      </div>
+                      {feedback === 'other' && (
+                        <form
+                          className="identify-other"
+                          onSubmit={e => { e.preventDefault(); saveFeedback(otherId); }}
+                        >
+                          <input
+                            className="input"
+                            placeholder="Correct design number"
+                            value={otherId}
+                            onChange={e => setOtherId(e.target.value.toUpperCase())}
+                            autoFocus
+                          />
+                          <button className="btn btn-primary" type="submit" disabled={!otherId.trim()}>Save</button>
+                        </form>
+                      )}
+                      <p className="field-hint">The photo is saved with the right design number to check accuracy and improve matching later.</p>
+                    </>
+                  )}
+                </div>
               </section>
             )}
           </>

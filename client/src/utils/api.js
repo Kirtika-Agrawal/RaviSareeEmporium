@@ -135,6 +135,18 @@ export async function identifyPhoto(photo, hint) {
   return res.json();
 }
 
+// suggested: the design numbers that were shown, best first
+export async function sendIdentifyFeedback(photo, productId, suggested, hint) {
+  const formData = new FormData();
+  formData.append('photo', photo, 'photo.jpg');
+  formData.append('product_id', productId);
+  formData.append('suggested', JSON.stringify(suggested));
+  if (hint) formData.append('hint', hint);
+  const res = await fetch(`${BASE}/identify/feedback`, { method: 'POST', headers: authHeader(), body: formData });
+  if (!res.ok) throw new Error((await res.json()).error || 'Could not save');
+  return res.json();
+}
+
 export async function deleteProduct(productId) {
   const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, {
     method: 'DELETE',

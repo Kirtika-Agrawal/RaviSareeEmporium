@@ -1422,6 +1422,36 @@ h1, h2, h3 {
   color: var(--muted);
 }
 
+.identify-accuracy {
+  font-size: 0.85rem;
+  margin-bottom: 16px;
+  color: var(--muted);
+}
+
+.identify-accuracy strong { color: var(--ink); }
+
+.identify-feedback {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.identify-other {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.identify-other .input { flex: 1; }
+
+.identify-thanks {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: center;
+}
+
 .menu-item.active {
   color: var(--brand);
   font-weight: 700;
