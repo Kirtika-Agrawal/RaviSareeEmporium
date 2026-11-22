@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useLayoutEffect } from 'react';
-import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl } from '../utils/api';
+import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl, trackEvent, trackView } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import { useAdmin } from '../hooks/useAdmin';
 import VariantModal from '../components/VariantModal';
@@ -7,6 +7,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import EditDetailsModal from '../components/EditDetailsModal';
 import ImageViewer from '../components/ImageViewer';
 import PageHeader from '../components/PageHeader';
+import TrashIcon from '../components/TrashIcon';
 import { EnquiryBar } from '../components/WhatsApp';
 import { hasWhatsApp, designEnquiry } from '../utils/whatsapp';
 import { addRecent, removeRecent } from '../utils/recent';
@@ -41,6 +42,7 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
     try {
       const data = await fetchProduct(productId);
       setProduct(data);
+      trackView(productId);
       if (data.variants?.length) addRecent(productId, data.variants[0].image_path);
     } catch (err) {
       toast(err.message, 'error');
@@ -165,7 +167,7 @@ const handleShareSelected = async () => {
             onClick={() => setShowDeleteProduct(true)}
             title="Delete this design"
           >
-            🗑 Delete
+            <TrashIcon /> Delete
           </button>
         )}
       />
@@ -308,8 +310,9 @@ const handleShareSelected = async () => {
                           className="btn btn-danger-text btn-sm"
                           onClick={() => setDeleteVariantTarget(v)}
                           title="Delete colour"
+                          aria-label={`Delete colour ${v.variant_number}`}
                         >
-                          🗑
+                          <TrashIcon />
                         </button>
                       </div>
                     )}
@@ -327,6 +330,7 @@ const handleShareSelected = async () => {
           label={selectedColours.length
             ? `Enquire about ${selectedColours.length} colour${selectedColours.length > 1 ? 's' : ''}`
             : 'Enquire on WhatsApp'}
+          onEnquire={kind => trackEvent(productId, kind)}
         />
       )}
 

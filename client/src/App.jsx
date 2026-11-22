@@ -5,12 +5,13 @@ import HomePage, { rememberHomeScroll } from './pages/HomePage';
 import ProductPage from './pages/ProductPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import StatsPage from './pages/StatsPage';
 import SideMenu from './components/SideMenu';
 import { parseRoute, productPath, categoryPath, currentPath } from './utils/routes';
 import { renameRecent } from './utils/recent';
 import { shop } from './shop';
 
-const PAGE_TITLES = { about: 'About', contact: 'Contact' };
+const PAGE_TITLES = { about: 'About', contact: 'Contact', stats: 'Stats' };
 
 export default function App() {
   const [route, setRoute] = useState(() => parseRoute());
@@ -85,6 +86,9 @@ export default function App() {
         )}
         {route.page === 'about' && <AboutPage onBack={goBack} onMenu={openMenu} navigate={navigate} />}
         {route.page === 'contact' && <ContactPage onBack={goBack} onMenu={openMenu} />}
+        {route.page === 'stats' && (
+          <StatsPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
+        )}
         {route.page === 'home' && (
           <HomePage
             category={route.category}

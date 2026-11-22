@@ -17,6 +17,7 @@ const ICONS = {
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z',
   share: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
   lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   tag: 'M3 12.5V4h8.5L21 13.5 13.5 21 3 12.5zM7.5 8v.01',
 };
 
@@ -121,6 +122,7 @@ export default function SideMenu({ open, route, onClose, navigate }) {
             {navItem('/', page === 'home' && !activeCategory, 'home', 'All designs')}
             {navItem('/about', page === 'about', 'info', 'About us')}
             {navItem('/contact', page === 'contact', 'pin', 'Contact & visit')}
+            {isAdmin && navItem('/stats', page === 'stats', 'chart', 'Stats (staff)')}
           </nav>
 
           {categories.length > 0 && (

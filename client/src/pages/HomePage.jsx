@@ -4,8 +4,10 @@ import { useToast } from '../hooks/useToast';
 import { useAdmin } from '../hooks/useAdmin';
 import AddProductModal from '../components/AddProductModal';
 import ConfirmModal from '../components/ConfirmModal';
+import BulkCategoryModal from '../components/BulkCategoryModal';
+import TrashIcon from '../components/TrashIcon';
 import { MenuButton } from '../components/SideMenu';
-import { WhatsAppFab } from '../components/WhatsApp';
+import { WhatsAppFab, useReserveBottom } from '../components/WhatsApp';
 import { hasWhatsApp, generalEnquiry } from '../utils/whatsapp';
 import { removeRecent } from '../utils/recent';
 import { countCategories, rememberCategoryCounts } from '../utils/categories';
@@ -18,6 +20,26 @@ export function rememberHomeScroll() {
   homeCache.scrollY = window.scrollY;
 }
 
+function SelectionBar({ count, total, onSelectAll, onCancel, onSetCategory }) {
+  useReserveBottom(80);
+  return (
+    <div className="enquiry-bar">
+      <div className="enquiry-bar-inner selection-bar">
+        <div className="selection-info">
+          <strong>{count} selected</strong>
+          {count < total && (
+            <button className="link-btn" onClick={onSelectAll}>Select all {total}</button>
+          )}
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary btn-sm" onClick={onSetCategory} disabled={count === 0}>
+          Set category
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage({ category, onCategoryChange, onSelectProduct, onMenu }) {
   const toast = useToast();
   const { isAdmin, logout } = useAdmin();
@@ -27,6 +49,13 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [imgErrors, setImgErrors] = useState({});
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [showBulk, setShowBulk] = useState(false);
+  const [untaggedOnly, setUntaggedOnly] = useState(false);
+  // Leaving staff mode drops staff-only views without needing a reset.
+  const selectMode = isAdmin && selecting;
+  const untagged = isAdmin && untaggedOnly;
 
   useLayoutEffect(() => {
     if (homeCache.products) window.scrollTo(0, homeCache.scrollY);
@@ -72,7 +101,35 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
 
   const chips = countCategories(products);
   if (category && !chips.some(c => c.name === category)) chips.push({ name: category, count: 0 });
-  const visible = category ? products.filter(p => p.category === category) : products;
+  const untaggedCount = products.filter(p => !p.category).length;
+  const visible = untagged ? products.filter(p => !p.category)
+    : category ? products.filter(p => p.category === category)
+    : products;
+
+  const showCategory = (name) => {
+    setUntaggedOnly(false);
+    onCategoryChange(name);
+  };
+
+  const showUntagged = () => {
+    setUntaggedOnly(!untagged);
+    if (category) onCategoryChange(null);
+  };
+
+  const toggleSelected = (id) => {
+    setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
+
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected([]);
+  };
+
+  const handleBulkDone = () => {
+    setShowBulk(false);
+    stopSelecting();
+    load(search);
+  };
 
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
@@ -95,34 +152,44 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
       </header>
 
       <div className="page-body">
-        {chips.length > 0 && (
+        {(chips.length > 0 || (isAdmin && untaggedCount > 0)) && (
           <div className="chip-row" role="toolbar" aria-label="Browse by category">
             <button
-              className={`chip ${!category ? 'active' : ''}`}
-              aria-pressed={!category}
-              onClick={() => onCategoryChange(null)}
+              className={`chip ${!category && !untagged ? 'active' : ''}`}
+              aria-pressed={!category && !untagged}
+              onClick={() => showCategory(null)}
             >
               All <span className="chip-count">{products.length}</span>
             </button>
             {chips.map(c => (
               <button
                 key={c.name}
-                className={`chip ${category === c.name ? 'active' : ''}`}
-                aria-pressed={category === c.name}
-                onClick={() => onCategoryChange(category === c.name ? null : c.name)}
+                className={`chip ${!untagged && category === c.name ? 'active' : ''}`}
+                aria-pressed={!untagged && category === c.name}
+                onClick={() => showCategory(category === c.name ? null : c.name)}
               >
                 {c.name} <span className="chip-count">{c.count}</span>
               </button>
             ))}
+            {isAdmin && (untaggedCount > 0 || untagged) && (
+              <button
+                className={`chip chip-staff ${untagged ? 'active' : ''}`}
+                aria-pressed={untagged}
+                onClick={showUntagged}
+                title="Staff only: designs without a category"
+              >
+                Untagged <span className="chip-count">{untaggedCount}</span>
+              </button>
+            )}
           </div>
         )}
 
         <div className="toolbar">
           <span className="muted">
-            {visible.length} {category ? `${category} ` : ''}{visible.length === 1 ? 'design' : 'designs'}
+            {visible.length} {untagged ? 'untagged ' : category ? `${category} ` : ''}{visible.length === 1 ? 'design' : 'designs'}
             {search && ` matching "${search}"`}
           </span>
-          {isAdmin && (
+          {isAdmin && !selectMode && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 className="btn btn-ghost btn-sm"
@@ -131,11 +198,21 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
               >
                 Exit Staff
               </button>
+              {visible.length > 0 && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setSelecting(true)}
+                  title="Select several designs to set their category"
+                >
+                  Select
+                </button>
+              )}
               <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)}>
                 + New Design
               </button>
             </div>
           )}
+          {selectMode && <span className="muted">Tap designs to select them</span>}
         </div>
 
         {/* Loading — keep showing the current list while it refreshes */}
@@ -163,9 +240,18 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
 
         {products.length > 0 && visible.length === 0 && (
           <div className="empty-state fade-in">
-            <h3>No {category} designs {search ? 'found' : 'yet'}</h3>
-            <p>{search ? `Nothing in ${category} matches "${search}".` : 'Have a look at the rest of the collection.'}</p>
-            <button className="btn btn-secondary" onClick={() => onCategoryChange(null)} style={{ marginTop: 20 }}>
+            {untagged ? (
+              <>
+                <h3>Every design has a category</h3>
+                <p>{search ? `No untagged design matches "${search}".` : 'Nothing left to tag.'}</p>
+              </>
+            ) : (
+              <>
+                <h3>No {category} designs {search ? 'found' : 'yet'}</h3>
+                <p>{search ? `Nothing in ${category} matches "${search}".` : 'Have a look at the rest of the collection.'}</p>
+              </>
+            )}
+            <button className="btn btn-secondary" onClick={() => showCategory(null)} style={{ marginTop: 20 }}>
               Show all designs
             </button>
           </div>
@@ -176,11 +262,13 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
             {visible.map((p, i) => (
               <div
                 key={p.product_id}
-                className="card fade-in"
+                className={`card fade-in${selectMode ? ' selectable' : ''}${selectMode && selected.includes(p.product_id) ? ' selected' : ''}`}
                 style={{ animationDelay: `${Math.min(i, 12) * 0.05}s` }}
-                onClick={() => onSelectProduct(p.product_id)}
+                onClick={() => (selectMode ? toggleSelected(p.product_id) : onSelectProduct(p.product_id))}
+                aria-pressed={selectMode ? selected.includes(p.product_id) : undefined}
               >
                 <div className="card-photo">
+                  {selectMode && <span className="select-check" aria-hidden="true">✓</span>}
                   {p.first_image && !imgErrors[p.product_id] ? (
                     <img
                       src={getImageUrl(p.first_image)}
@@ -192,13 +280,14 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
                   ) : (
                     <div className="fallback">🥻</div>
                   )}
-                  {isAdmin && (
+                  {isAdmin && !selectMode && (
                     <button
                       className="photo-action"
                       onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
-                      title="Delete product"
+                      title="Delete design"
+                      aria-label={`Delete design ${p.product_id}`}
                     >
-                      🗑
+                      <TrashIcon size={17} />
                     </button>
                   )}
                 </div>
@@ -213,7 +302,25 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
         )}
       </div>
 
-      {hasWhatsApp && <WhatsAppFab message={generalEnquiry} />}
+      {selectMode ? (
+        <SelectionBar
+          count={selected.length}
+          total={visible.length}
+          onSelectAll={() => setSelected(visible.map(p => p.product_id))}
+          onCancel={stopSelecting}
+          onSetCategory={() => setShowBulk(true)}
+        />
+      ) : (
+        hasWhatsApp && <WhatsAppFab message={generalEnquiry} />
+      )}
+
+      {showBulk && (
+        <BulkCategoryModal
+          productIds={selected}
+          onClose={() => setShowBulk(false)}
+          onDone={handleBulkDone}
+        />
+      )}
 
       {showAddModal && (
         <AddProductModal

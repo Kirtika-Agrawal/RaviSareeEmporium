@@ -84,6 +84,41 @@ export async function updateProduct(productId, changes) {
   return res.json();
 }
 
+// Empty category removes it.
+export async function setCategoryForProducts(productIds, category) {
+  const res = await fetch(`${BASE}/products`, {
+    method: 'PATCH',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ product_ids: productIds, category }),
+  });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to update designs');
+  return res.json();
+}
+
+// event: 'view' | 'whatsapp' | 'call'. Staff views are counted separately so
+// they don't inflate the customer numbers; staff enquiry taps are ignored.
+export function trackEvent(productId, event) {
+  const staff = Boolean(getAdminPassword());
+  if (staff && event !== 'view') return;
+  const params = new URLSearchParams({ product_id: productId, event: staff ? 'staff_view' : event });
+  fetch(`${BASE}/track?${params}`, { method: 'POST', keepalive: true }).catch(() => {});
+}
+
+// Counts a design once per browser session, so flicking back and forth
+// doesn't inflate its views.
+export function trackView(productId) {
+  const key = `rse_viewed:${getAdminPassword() ? 'staff:' : ''}${productId}`;
+  if (sessionStorage.getItem(key)) return;
+  sessionStorage.setItem(key, '1');
+  trackEvent(productId, 'view');
+}
+
+export async function fetchStats(days) {
+  const res = await fetch(`${BASE}/stats?days=${days}`, { headers: authHeader() });
+  if (!res.ok) throw new Error((await res.json()).error || 'Failed to load stats');
+  return res.json();
+}
+
 export async function deleteProduct(productId) {
   const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`, {
     method: 'DELETE',

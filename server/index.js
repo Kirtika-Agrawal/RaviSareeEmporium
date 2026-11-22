@@ -96,6 +96,18 @@ const initDb = async () => {
   if (!productColumns.rows.some(c => c.name === 'category')) {
     await db.execute('ALTER TABLE products ADD COLUMN category TEXT');
   }
+  // One row per design per day keeps the table small however busy the site gets.
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS product_stats (
+      product_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      views INTEGER NOT NULL DEFAULT 0,
+      whatsapp INTEGER NOT NULL DEFAULT 0,
+      calls INTEGER NOT NULL DEFAULT 0,
+      staff_views INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (product_id, day)
+    )
+  `);
   console.log('✅ Turso database ready');
 };
 
@@ -187,10 +199,21 @@ app.get('/api/auth/check', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/products
+// GET /api/products?search=   or   ?limit=&category=  (newest designs only)
 app.get('/api/products', async (req, res) => {
   try {
     const { search } = req.query;
+    const limit = parseInt(req.query.limit, 10);
+    if (limit > 0) {
+      const category = normalizeCategory(req.query.category);
+      const latest = await db.execute({
+        sql: `SELECT ${PRODUCT_LIST_COLUMNS} FROM products p
+              ${category ? 'WHERE p.category = ?' : ''}
+              ORDER BY p.created_at DESC LIMIT ?`,
+        args: category ? [category, Math.min(limit, 50)] : [Math.min(limit, 50)]
+      });
+      return res.json(latest.rows);
+    }
     let result;
     if (search && search.trim()) {
       result = await db.execute({
@@ -372,6 +395,26 @@ app.delete('/api/variants/:id', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/products  { product_ids, category } — tag many designs at once
+app.patch('/api/products', requireAuth, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.product_ids)
+      ? [...new Set(req.body.product_ids.map(String))].slice(0, 500)
+      : [];
+    if (ids.length === 0) return res.status(400).json({ error: 'Choose at least one design' });
+    if (!Object.prototype.hasOwnProperty.call(req.body, 'category')) {
+      return res.status(400).json({ error: 'Category is required' });
+    }
+    const result = await db.execute({
+      sql: `UPDATE products SET category = ? WHERE product_id IN (${ids.map(() => '?').join(', ')})`,
+      args: [normalizeCategory(req.body.category), ...ids]
+    });
+    res.json({ updated: result.rowsAffected });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/products/:productId  { new_product_id?, category? }
 app.patch('/api/products/:productId', requireAuth, async (req, res) => {
   try {
@@ -408,6 +451,7 @@ app.patch('/api/products/:productId', requireAuth, async (req, res) => {
         args: [newId, productId]
       },
       { sql: 'UPDATE variants SET product_id = ? WHERE product_id = ?', args: [newId, productId] },
+      { sql: 'UPDATE product_stats SET product_id = ? WHERE product_id = ?', args: [newId, productId] },
       { sql: 'DELETE FROM products WHERE product_id = ?', args: [productId] },
     ], 'write');
 
@@ -439,8 +483,73 @@ app.delete('/api/products/:productId', requireAuth, async (req, res) => {
     }
 
     await db.execute({ sql: 'DELETE FROM variants WHERE product_id = ?', args: [productId] });
+    await db.execute({ sql: 'DELETE FROM product_stats WHERE product_id = ?', args: [productId] });
     await db.execute({ sql: 'DELETE FROM products WHERE product_id = ?', args: [productId] });
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+const STAT_COLUMNS = { view: 'views', whatsapp: 'whatsapp', call: 'calls', staff_view: 'staff_views' };
+
+// The shop's calendar day, so "today" flips at midnight in India.
+const shopDay = (offsetDays = 0) =>
+  new Date(Date.now() + 5.5 * 3600e3 - offsetDays * 86400e3).toISOString().slice(0, 10);
+
+// POST /api/track?product_id=&event=view|whatsapp|call|staff_view
+// Query params rather than a JSON body keep this a CORS "simple" request, so
+// the browser can fire it while the page is opening WhatsApp.
+app.post('/api/track', async (req, res) => {
+  const column = STAT_COLUMNS[req.query.event];
+  const productId = String(req.query.product_id || '').slice(0, 60);
+  if (!column || !productId) return res.status(400).json({ error: 'Invalid event' });
+  try {
+    await db.execute({
+      sql: `
+        INSERT INTO product_stats (product_id, day, ${column})
+        SELECT ?, ?, 1 WHERE EXISTS (SELECT 1 FROM products WHERE product_id = ?)
+        ON CONFLICT (product_id, day) DO UPDATE SET ${column} = ${column} + 1
+      `,
+      args: [productId, shopDay(), productId]
+    });
+    res.status(204).end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stats?days=7|30|0   (0 = all time)
+app.get('/api/stats', requireAuth, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days, 10);
+    const since = days > 0 ? shopDay(days - 1) : '0000-00-00';
+    const [totals, designs] = await db.batch([
+      {
+        sql: `SELECT COALESCE(SUM(views), 0) AS views, COALESCE(SUM(whatsapp), 0) AS whatsapp,
+                     COALESCE(SUM(calls), 0) AS calls, COALESCE(SUM(staff_views), 0) AS staff_views
+              FROM product_stats WHERE day >= ?`,
+        args: [since]
+      },
+      {
+        sql: `
+          SELECT s.product_id, p.category,
+            SUM(s.views) AS views, SUM(s.whatsapp) AS whatsapp, SUM(s.calls) AS calls,
+            SUM(s.staff_views) AS staff_views,
+            (SELECT v.image_path FROM variants v WHERE v.product_id = s.product_id
+              ORDER BY v.variant_number ASC LIMIT 1) AS first_image
+          FROM product_stats s
+          JOIN products p ON p.product_id = s.product_id
+          WHERE s.day >= ?
+          GROUP BY s.product_id
+          ORDER BY SUM(s.whatsapp) + SUM(s.calls) DESC, SUM(s.views) DESC
+          LIMIT 50
+        `,
+        args: [since]
+      },
+    ], 'read');
+    res.json({ since: days > 0 ? since : null, totals: totals.rows[0], designs: designs.rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

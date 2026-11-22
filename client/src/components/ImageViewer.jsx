@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { getImageUrl } from '../utils/api';
+import { getImageUrl, trackEvent } from '../utils/api';
 import ZoomableImage from './ZoomableImage';
 import { WhatsAppIcon } from './WhatsApp';
 import { hasWhatsApp, whatsappLink, designEnquiry } from '../utils/whatsapp';
@@ -116,6 +116,7 @@ export default function ImageViewer({ productId, variants, startIndex, onClose, 
               href={whatsappLink(designEnquiry(productId, [current.variant_number]))}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackEvent(productId, 'whatsapp')}
               title={`Enquire about colour ${current.variant_number} on WhatsApp`}
             >
               <WhatsAppIcon size={20} />

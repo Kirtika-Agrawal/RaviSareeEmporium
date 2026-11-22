@@ -1,8 +1,39 @@
 {
+  "images": {
+    "sizes": [640],
+    "minimumCacheTTL": 86400,
+    "remotePatterns": [
+      { "protocol": "https", "hostname": "ravi-saree-emporium.s3.ap-south-1.amazonaws.com" }
+    ]
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
       "destination": "https://ravisareeemporium.onrender.com/api/:path*"
+    },
+    {
+      "source": "/product/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|Pinterestbot|SkypeUriPreview|Viber).*"
+        }
+      ],
+      "missing": [{ "type": "query", "key": "app" }],
+      "destination": "/api/link-preview?id=:id"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|Pinterestbot|SkypeUriPreview|Viber).*"
+        }
+      ],
+      "missing": [{ "type": "query", "key": "app" }],
+      "destination": "/api/link-preview"
     },
     {
       "source": "/(.*)",

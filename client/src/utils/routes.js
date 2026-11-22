@@ -12,5 +12,6 @@ export function parseRoute(path = currentPath()) {
   if (match) return { page: 'product', id: decodeURIComponent(match[1]) };
   if (/^\/about\/?$/.test(url.pathname)) return { page: 'about' };
   if (/^\/contact\/?$/.test(url.pathname)) return { page: 'contact' };
+  if (/^\/stats\/?$/.test(url.pathname)) return { page: 'stats' };
   return { page: 'home', category: normalizeCategory(url.searchParams.get('category')) };
 }

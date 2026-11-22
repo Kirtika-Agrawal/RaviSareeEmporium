@@ -10,7 +10,7 @@ export function WhatsAppIcon({ size = 20 }) {
 }
 
 // Lifts toasts above whatever is pinned to the bottom of the screen.
-function useReserveBottom(px) {
+export function useReserveBottom(px) {
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--bottom-reserved', `${px}px`);
@@ -34,15 +34,21 @@ export function WhatsAppFab({ message }) {
   );
 }
 
-export function EnquiryBar({ message, label }) {
+export function EnquiryBar({ message, label, onEnquire }) {
   useReserveBottom(80);
   return (
     <div className="enquiry-bar">
       <div className="enquiry-bar-inner">
-        <a className="btn btn-wa" href={whatsappLink(message)} target="_blank" rel="noopener noreferrer">
+        <a
+          className="btn btn-wa"
+          href={whatsappLink(message)}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => onEnquire?.('whatsapp')}
+        >
           <WhatsAppIcon size={18} /> {label}
         </a>
-        <a className="btn btn-secondary btn-call" href={callLink}>Call</a>
+        <a className="btn btn-secondary btn-call" href={callLink} onClick={() => onEnquire?.('call')}>Call</a>
       </div>
     </div>
   );
