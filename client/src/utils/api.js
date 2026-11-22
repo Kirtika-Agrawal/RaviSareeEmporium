@@ -1,5 +1,6 @@
-//const BASE = '/api';
-const BASE = import.meta.env.VITE_API_URL || 'https://ravisareeemporium.onrender.com/api';
+// Also hard-coded in client/vercel.json and client/api/link-preview.js.
+const API_ORIGIN = 'https://ravisareeemporium-iwcl.onrender.com';
+const BASE = import.meta.env.VITE_API_URL || `${API_ORIGIN}/api`;
 
 export async function fetchProducts(search = '') {
   const url = search ? `${BASE}/products?search=${encodeURIComponent(search)}` : `${BASE}/products`;
@@ -158,7 +159,7 @@ export async function deleteProduct(productId) {
 
 export function getProxyUrl(imagePath) {
   const imageUrl = getImageUrl(imagePath);
-  return `https://ravisareeemporium.onrender.com/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+  return `${API_ORIGIN}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
 }
 
 export function getImageUrl(imagePath) {
@@ -166,5 +167,5 @@ export function getImageUrl(imagePath) {
   // If already a full S3 URL, use it directly
   if (imagePath.startsWith('http')) return imagePath;
   // Fallback for any old local paths
-  return `https://ravisareeemporium.onrender.com/uploads/${imagePath}`;
+  return `${API_ORIGIN}/uploads/${imagePath}`;
 }

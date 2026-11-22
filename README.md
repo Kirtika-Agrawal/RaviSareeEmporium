@@ -3,7 +3,7 @@
 A luxurious, full-stack product catalogue manager for a traditional Indian saree and lehenga business, with a Royal Rajasthani textile design theme.
 
 🌐 **Live App**: [ravi-saree-emporium.vercel.app](https://ravi-saree-emporium.vercel.app)
-⚙️ **API**: [ravisareeemporium.onrender.com](https://ravisareeemporium.onrender.com)
+⚙️ **API**: [ravisareeemporium-iwcl.onrender.com](https://ravisareeemporium-iwcl.onrender.com)
 
 ---
 
@@ -158,7 +158,7 @@ The `client/` folder is deployed to Vercel.
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ravisareeemporium.onrender.com/api/:path*"
+      "destination": "https://ravisareeemporium-iwcl.onrender.com/api/:path*"
     }
   ]
 }

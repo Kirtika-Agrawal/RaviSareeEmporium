@@ -4,7 +4,7 @@
 // never hit this; they get the normal app.
 
 const SITE = 'Ravi Saree Emporium';
-const API = process.env.PREVIEW_API_URL || 'https://ravisareeemporium.onrender.com/api';
+const API = process.env.PREVIEW_API_URL || 'https://ravisareeemporium-iwcl.onrender.com/api';
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, ch => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
