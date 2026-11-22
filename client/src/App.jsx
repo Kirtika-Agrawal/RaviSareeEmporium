@@ -1,20 +1,54 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ToastProvider } from './hooks/useToast';
-import { AdminProvider } from './hooks/useAdmin';
+import { AdminProvider, useAdmin } from './hooks/useAdmin';
+import { AccessProvider, useAccess } from './hooks/useAccess';
 import HomePage, { rememberHomeScroll } from './pages/HomePage';
 import ProductPage from './pages/ProductPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import StatsPage from './pages/StatsPage';
 import IdentifyPage from './pages/IdentifyPage';
+import CustomersPage from './pages/CustomersPage';
+import LoginPage from './pages/LoginPage';
 import SideMenu from './components/SideMenu';
 import { parseRoute, productPath, categoryPath, currentPath } from './utils/routes';
 import { renameRecent } from './utils/recent';
+import { setOnLocked } from './utils/api';
 import { shop } from './shop';
 
-const PAGE_TITLES = { about: 'About', contact: 'Contact', stats: 'Stats', identify: 'Find by photo' };
+const PAGE_TITLES = { about: 'About', contact: 'Contact', stats: 'Stats', identify: 'Find by photo', customers: 'Customers' };
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AdminProvider>
+        <AccessProvider>
+          <Site />
+        </AccessProvider>
+      </AdminProvider>
+    </ToastProvider>
+  );
+}
+
+function Site() {
+  const { isAdmin, logout } = useAdmin();
+  const access = useAccess();
+  const { refresh } = access;
+
+  useEffect(() => {
+    setOnLocked(() => {
+      logout();
+      refresh();
+    });
+  }, [logout, refresh]);
+
+  // Only staff and approved customers see the catalogue; the server enforces
+  // the same rule for every design and photo.
+  if (!isAdmin && access.status !== 'approved') return <LoginPage />;
+  return <Catalogue />;
+}
+
+function Catalogue() {
   const [route, setRoute] = useState(() => parseRoute());
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -80,30 +114,31 @@ export default function App() {
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   return (
-    <ToastProvider>
-      <AdminProvider>
-        {route.page === 'product' && (
-          <ProductPage key={route.id} productId={route.id} onBack={goBack} onRenamed={handleRenamed} onMenu={openMenu} />
-        )}
-        {route.page === 'about' && <AboutPage onBack={goBack} onMenu={openMenu} navigate={navigate} />}
-        {route.page === 'contact' && <ContactPage onBack={goBack} onMenu={openMenu} />}
-        {route.page === 'stats' && (
-          <StatsPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
-        )}
-        {route.page === 'identify' && (
-          <IdentifyPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
-        )}
-        {route.page === 'home' && (
-          <HomePage
-            category={route.category}
-            onCategoryChange={setHomeCategory}
-            onSelectProduct={id => navigate(productPath(id))}
-            onFindByPhoto={() => navigate('/identify')}
-            onMenu={openMenu}
-          />
-        )}
-        <SideMenu open={menuOpen} route={route} onClose={closeMenu} navigate={navigate} />
-      </AdminProvider>
-    </ToastProvider>
+    <>
+      {route.page === 'product' && (
+        <ProductPage key={route.id} productId={route.id} onBack={goBack} onRenamed={handleRenamed} onMenu={openMenu} />
+      )}
+      {route.page === 'about' && <AboutPage onBack={goBack} onMenu={openMenu} navigate={navigate} />}
+      {route.page === 'contact' && <ContactPage onBack={goBack} onMenu={openMenu} />}
+      {route.page === 'stats' && (
+        <StatsPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
+      )}
+      {route.page === 'identify' && (
+        <IdentifyPage onBack={goBack} onMenu={openMenu} onSelectProduct={id => navigate(productPath(id))} />
+      )}
+      {route.page === 'home' && (
+        <HomePage
+          category={route.category}
+          onCategoryChange={setHomeCategory}
+          onSelectProduct={id => navigate(productPath(id))}
+          onFindByPhoto={() => navigate('/identify')}
+          onMenu={openMenu}
+        />
+      )}
+      {route.page === 'customers' && (
+        <CustomersPage key={route.request} onBack={goBack} onMenu={openMenu} requestId={route.request} />
+      )}
+      <SideMenu open={menuOpen} route={route} onClose={closeMenu} navigate={navigate} />
+    </>
   );
 }

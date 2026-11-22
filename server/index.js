@@ -3,9 +3,11 @@ const cors = require('cors');
 const multer = require('multer');
 const multerS3 = require('multer-s3');
 const path = require('path');
-const { S3Client, DeleteObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, DeleteObjectCommand, PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { createClient } = require('@libsql/client');
 const { createPhotoMatcher } = require('./photo_match');
+const { createCustomerAccess } = require('./customer_access');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +28,39 @@ const getS3Key = (imagePath) => {
   if (imagePath.startsWith('http')) return imagePath.split('.amazonaws.com/')[1];
   return imagePath;
 };
+
+// The bucket is private, so viewers get photo links that stop working after a
+// day or two. Every link is signed as of midnight UTC, which keeps it the same
+// all day and lets browsers cache the photo.
+const LINK_DAYS = 2;
+const signedLinks = new Map();
+let signedDay = '';
+
+const photoUrl = async (imagePath) => {
+  let host;
+  try {
+    host = new URL(imagePath).hostname;
+  } catch {
+    return imagePath;
+  }
+  if (!allowedImageHosts.has(host)) return imagePath;
+  const day = new Date().toISOString().slice(0, 10);
+  if (day !== signedDay) {
+    signedLinks.clear();
+    signedDay = day;
+  }
+  const key = getS3Key(imagePath);
+  if (!signedLinks.has(key)) {
+    signedLinks.set(key, await getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), {
+      expiresIn: LINK_DAYS * 86400,
+      signingDate: new Date(`${day}T00:00:00Z`),
+    }));
+  }
+  return signedLinks.get(key);
+};
+
+const withPhotoUrls = (rows, field) =>
+  Promise.all(rows.map(async row => ({ ...row, [field]: await photoUrl(row[field]) })));
 
 const deleteFromS3 = async (imagePath) => {
   const key = getS3Key(imagePath);
@@ -77,7 +112,8 @@ const db = createClient({
   url: process.env.TURSO_URL,
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
-const photoMatcher = createPhotoMatcher(db);
+const photoMatcher = createPhotoMatcher(db, { photoUrl });
+const customerAccess = createCustomerAccess(db);
 
 const initDb = async () => {
   await db.execute(`
@@ -123,6 +159,7 @@ const initDb = async () => {
     )
   `);
   await photoMatcher.init();
+  await customerAccess.init();
   console.log('✅ Turso database ready');
 };
 
@@ -149,7 +186,117 @@ const allowedImageHosts = new Set([
   `${BUCKET}.s3.amazonaws.com`,
 ]);
 
-app.get('/api/image-proxy', (req, res) => {
+// ── MIDDLEWARE ────────────────────────────────────────────────────────────────
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowed = [
+      "https://ravi-saree-emporium.vercel.app",
+      "http://localhost:5173"
+    ];
+    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
+app.use(express.json());
+
+// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
+const isStaff = (req) =>
+  Boolean(process.env.ADMIN_PASSWORD) && req.headers['x-admin-password'] === process.env.ADMIN_PASSWORD;
+
+const requireAuth = (req, res, next) => {
+  if (!isStaff(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+};
+
+// The catalogue is only for staff and customers they've approved.
+const requireViewer = async (req, res, next) => {
+  if (isStaff(req)) return next();
+  try {
+    const customer = await customerAccess.check(req.headers['x-access-token']);
+    if (customer?.status === 'approved') return next();
+    res.status(401).json({ error: 'Please log in to see the catalogue', access: customer?.status || 'none' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const sendAccessError = (res, err) =>
+  res.status(err instanceof customerAccess.AccessError ? err.status : 500).json({ error: err.message });
+
+// ── ROUTES ────────────────────────────────────────────────────────────────────
+
+app.get('/', (req, res) => {
+  res.send('🪷 Ravi Saree Emporium API is running!');
+});
+
+// GET /api/auth/check — lets the client verify the staff password up front
+app.get('/api/auth/check', requireAuth, (req, res) => {
+  res.json({ ok: true });
+});
+
+// ── CUSTOMER ACCESS ───────────────────────────────────────────────────────────
+
+// POST /api/access/request  { name, phone } -> { token, customer }
+app.post('/api/access/request', async (req, res) => {
+  try {
+    res.json(await customerAccess.request(req.body || {}));
+  } catch (err) {
+    sendAccessError(res, err);
+  }
+});
+
+// GET /api/access/me — whether this browser's token has been approved yet
+app.get('/api/access/me', async (req, res) => {
+  try {
+    const customer = await customerAccess.check(req.headers['x-access-token']);
+    if (!customer) return res.status(401).json({ error: 'Not logged in', access: 'none' });
+    res.json(customer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/access/logout', async (req, res) => {
+  try {
+    await customerAccess.logout(req.headers['x-access-token']);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/customers', requireAuth, async (req, res) => {
+  try {
+    res.json(await customerAccess.list());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/customers  { name, phone } — staff add someone already approved
+app.post('/api/customers', requireAuth, async (req, res) => {
+  try {
+    res.status(201).json(await customerAccess.add(req.body || {}));
+  } catch (err) {
+    sendAccessError(res, err);
+  }
+});
+
+// POST /api/customers/:id/approve|reject|block|unblock
+app.post('/api/customers/:id/:action', requireAuth, async (req, res) => {
+  try {
+    res.json(await customerAccess.update(Number(req.params.id), req.params.action));
+  } catch (err) {
+    sendAccessError(res, err);
+  }
+});
+
+app.get('/api/image-proxy', requireViewer, (req, res) => {
   const { url } = req.query;
 
   let target;
@@ -168,54 +315,15 @@ app.get('/api/image-proxy', (req, res) => {
       return res.status(502).json({ error: `Upstream returned ${stream.statusCode}` });
     }
     res.setHeader('Content-Type', stream.headers['content-type'] || 'image/jpeg');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    // Upload keys are unique per file and never rewritten, so responses are
-    // safe to cache indefinitely.
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     stream.pipe(res);
   }).on('error', (err) => {
     res.status(502).json({ error: err.message });
   });
 });
 
-// ── MIDDLEWARE ────────────────────────────────────────────────────────────────
-app.use(cors({
-  origin: (origin, callback) => {
-    const allowed = [
-      "https://ravi-saree-emporium.vercel.app",
-      "http://localhost:5173"
-    ];
-    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
-}));
-app.use(express.json());
-
-// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
-const requireAuth = (req, res, next) => {
-  const password = req.headers['x-admin-password'];
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-};
-
-// ── ROUTES ────────────────────────────────────────────────────────────────────
-
-app.get('/', (req, res) => {
-  res.send('🪷 Ravi Saree Emporium API is running!');
-});
-
-// GET /api/auth/check — lets the client verify the staff password up front
-app.get('/api/auth/check', requireAuth, (req, res) => {
-  res.json({ ok: true });
-});
-
 // GET /api/products?search=   or   ?limit=&category=  (newest designs only)
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', requireViewer, async (req, res) => {
   try {
     const { search } = req.query;
     const limit = parseInt(req.query.limit, 10);
@@ -227,7 +335,7 @@ app.get('/api/products', async (req, res) => {
               ORDER BY p.created_at DESC LIMIT ?`,
         args: category ? [category, Math.min(limit, 50)] : [Math.min(limit, 50)]
       });
-      return res.json(latest.rows);
+      return res.json(await withPhotoUrls(latest.rows, 'first_image'));
     }
     let result;
     if (search && search.trim()) {
@@ -247,14 +355,14 @@ app.get('/api/products', async (req, res) => {
         ORDER BY p.created_at DESC
       `);
     }
-    res.json(result.rows);
+    res.json(await withPhotoUrls(result.rows, 'first_image'));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/products/:productId
-app.get('/api/products/:productId', async (req, res) => {
+app.get('/api/products/:productId', requireViewer, async (req, res) => {
   try {
     const { productId } = req.params;
     const productResult = await db.execute({
@@ -267,7 +375,7 @@ app.get('/api/products/:productId', async (req, res) => {
       sql: 'SELECT * FROM variants WHERE product_id = ? ORDER BY variant_number ASC',
       args: [productId]
     });
-    res.json({ ...productResult.rows[0], variants: variantsResult.rows });
+    res.json({ ...productResult.rows[0], variants: await withPhotoUrls(variantsResult.rows, 'image_path') });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -308,7 +416,7 @@ app.post('/api/products', requireAuth, upload.single('image'), async (req, res) 
       sql: `SELECT ${PRODUCT_LIST_COLUMNS} FROM products p WHERE p.product_id = ?`,
       args: [pid]
     });
-    res.status(201).json(newProduct.rows[0]);
+    res.status(201).json((await withPhotoUrls(newProduct.rows, 'first_image'))[0]);
   } catch (err) {
     if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
@@ -351,7 +459,7 @@ app.post('/api/variants', requireAuth, upload.single('image'), async (req, res) 
       sql: 'SELECT * FROM variants WHERE id = ?',
       args: [result.lastInsertRowid]
     });
-    res.status(201).json(newVariant.rows[0]);
+    res.status(201).json((await withPhotoUrls(newVariant.rows, 'image_path'))[0]);
   } catch (err) {
     if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
@@ -388,7 +496,7 @@ app.put('/api/variants/:id', requireAuth, upload.single('image'), async (req, re
       sql: 'SELECT * FROM variants WHERE id = ?',
       args: [id]
     });
-    res.json(updated.rows[0]);
+    res.json((await withPhotoUrls(updated.rows, 'image_path'))[0]);
   } catch (err) {
     if (req.file) await deleteFromS3(req.file.key);
     res.status(500).json({ error: err.message });
@@ -569,7 +677,7 @@ app.get('/api/stats', requireAuth, async (req, res) => {
         args: [since]
       },
     ], 'read');
-    res.json({ since: days > 0 ? since : null, totals: totals.rows[0], designs: designs.rows });
+    res.json({ since: days > 0 ? since : null, totals: totals.rows[0], designs: await withPhotoUrls(designs.rows, 'first_image') });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -596,7 +704,7 @@ app.post('/api/identify', requireAuth, (req, res) => {
     }
     try {
       const matches = await photoMatcher.findMatches(req.file.buffer, req.body.hint);
-      res.json({ matches, ...(await photoMatcher.status()) });
+      res.json({ matches: await withPhotoUrls(matches, 'image_path'), ...(await photoMatcher.status()) });
     } catch (err) {
       if (err instanceof photoMatcher.QuotaError) {
         return res.status(503).json({ error: "Today's photo matching limit is used up. Please try again in a few hours." });

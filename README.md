@@ -196,7 +196,7 @@ All uploaded images are stored permanently on AWS S3, so they survive server res
 - The full S3 URL is saved in the Turso database as `image_path`
 - When a variant or product is deleted, the image is also deleted from S3
 
-Make sure your S3 bucket has public read access or appropriate bucket policies for images to load in the browser.
+The bucket should be private (Block Public Access on, no public-read bucket policy). The server hands logged-in viewers signed photo links that expire after one to two days, and reads photos the same way for Find by photo. The IAM user in `AWS_ACCESS_KEY_ID` needs `s3:GetObject`, `s3:PutObject` and `s3:DeleteObject` on the bucket.
 
 ---
 
@@ -209,6 +209,16 @@ All product and variant data is stored in [Turso](https://turso.tech), a persist
 - Uses the `@libsql/client` npm package
 
 ---
+
+## 🔒 Private Catalogue
+
+Only staff and customers that staff approve can see designs and photos; the server refuses everyone else.
+
+- A customer enters their name and WhatsApp number on the login page, then sends the shop a pre-filled WhatsApp message containing an approval link
+- Staff open the link (Customers page), check the number matches the WhatsApp sender, and tap Approve; the customer's page opens by itself
+- A number that was approved before gets straight in on a new phone
+- Each browser stays logged in for 90 days after its last visit; Block on the Customers page logs a customer out everywhere at once
+- Link previews show only the title, never a photo, and the site asks search engines not to index it
 
 ## 🔐 Admin Authentication
 

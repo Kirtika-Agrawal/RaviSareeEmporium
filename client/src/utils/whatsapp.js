@@ -8,9 +8,12 @@ const NUMBER = digits.length === 10 ? `91${digits}` : digits;
 export const hasWhatsApp = NUMBER.length > 0;
 
 export const callLink = `tel:+${NUMBER}`;
-export const displayNumber = NUMBER.length === 12 && NUMBER.startsWith('91')
-  ? `+91 ${NUMBER.slice(2, 7)} ${NUMBER.slice(7)}`
-  : `+${NUMBER}`;
+// "919876543210" -> "+91 98765 43210"
+export const formatPhone = (digits) => (digits.length === 12 && digits.startsWith('91')
+  ? `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`
+  : `+${digits}`);
+
+export const displayNumber = formatPhone(NUMBER);
 
 export function whatsappLink(message) {
   return `https://wa.me/${NUMBER}?text=${encodeURIComponent(message)}`;

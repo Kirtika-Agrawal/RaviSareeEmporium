@@ -22,6 +22,13 @@ export function addRecent(id, imagePath) {
   save([{ id, image: imagePath }, ...getRecent().filter(r => r.id !== id)].slice(0, MAX));
 }
 
+// Photo links expire after a day or two, so swap in fresh ones whenever the
+// catalogue loads.
+export function refreshRecent(products) {
+  const images = new Map(products.map(p => [p.product_id, p.first_image]));
+  save(getRecent().map(r => (images.get(r.id) ? { ...r, image: images.get(r.id) } : r)));
+}
+
 export function removeRecent(id) {
   save(getRecent().filter(r => r.id !== id));
 }

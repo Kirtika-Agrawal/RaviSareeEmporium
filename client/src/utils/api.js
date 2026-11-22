@@ -2,17 +2,107 @@
 const API_ORIGIN = 'https://ravisareeemporium-iwcl.onrender.com';
 const BASE = import.meta.env.VITE_API_URL || `${API_ORIGIN}/api`;
 
+async function readJson(res, fallbackError) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || fallbackError);
+  return data;
+}
+
+// ── CUSTOMER ACCESS ──
+// Approved customers keep a token in this browser; staff use their password.
+const TOKEN_KEY = 'rse_access';
+
+export const getAccessToken = () => {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+export const setAccessToken = (token) => {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Private browsing: they'll be asked again next visit.
+  }
+};
+
+let onLocked = () => {};
+// Called when the server turns this browser away, e.g. after staff block it.
+export const setOnLocked = (fn) => { onLocked = fn; };
+
+export const viewerHeaders = () => {
+  const headers = {};
+  const password = getAdminPassword();
+  const token = getAccessToken();
+  if (password) headers['x-admin-password'] = password;
+  if (token) headers['x-access-token'] = token;
+  return headers;
+};
+
+async function fetchForViewer(url, fallbackError) {
+  const res = await fetch(url, { headers: viewerHeaders() });
+  if (res.status === 401) {
+    onLocked();
+    throw new Error('Please log in to see the catalogue');
+  }
+  return readJson(res, fallbackError);
+}
+
+// Returns { token, customer: { id, name, phone, status } }
+export async function requestAccess(name, phone) {
+  const res = await fetch(`${BASE}/access/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, phone }),
+  });
+  return readJson(res, 'Could not send your request');
+}
+
+// null when this browser has no token or it has expired
+export async function fetchMyAccess() {
+  const res = await fetch(`${BASE}/access/me`, { headers: { 'x-access-token': getAccessToken() } });
+  if (res.status === 401) return null;
+  return readJson(res, 'Could not check your access');
+}
+
+export async function logoutAccess() {
+  const token = getAccessToken();
+  setAccessToken('');
+  if (!token) return;
+  await fetch(`${BASE}/access/logout`, { method: 'POST', headers: { 'x-access-token': token } }).catch(() => {});
+}
+
+export async function fetchCustomers() {
+  const res = await fetch(`${BASE}/customers`, { headers: authHeader() });
+  return readJson(res, 'Failed to load customers');
+}
+
+export async function addCustomer(name, phone) {
+  const res = await fetch(`${BASE}/customers`, {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, phone }),
+  });
+  return readJson(res, 'Could not add the customer');
+}
+
+// action: 'approve' | 'reject' | 'block' | 'unblock'
+export async function updateCustomer(id, action) {
+  const res = await fetch(`${BASE}/customers/${id}/${action}`, { method: 'POST', headers: authHeader() });
+  return readJson(res, 'Could not update the customer');
+}
+
+// ── CATALOGUE ──
 export async function fetchProducts(search = '') {
   const url = search ? `${BASE}/products?search=${encodeURIComponent(search)}` : `${BASE}/products`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch products');
-  return res.json();
+  return fetchForViewer(url, 'Failed to fetch products');
 }
 
 export async function fetchProduct(productId) {
-  const res = await fetch(`${BASE}/products/${encodeURIComponent(productId)}`);
-  if (!res.ok) throw new Error((await res.json()).error || 'Product not found');
-  return res.json();
+  return fetchForViewer(`${BASE}/products/${encodeURIComponent(productId)}`, 'Product not found');
 }
 // Save password in session (clears when browser closes)
 export const setAdminPassword = (password) => {
@@ -160,6 +250,15 @@ export async function deleteProduct(productId) {
 export function getProxyUrl(imagePath) {
   const imageUrl = getImageUrl(imagePath);
   return `${API_ORIGIN}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+}
+
+// Photo links carry a signature in the query string, so take the name from the path.
+export function fileNameOf(imageUrl) {
+  try {
+    return new URL(imageUrl, window.location.origin).pathname.split('/').pop();
+  } catch {
+    return 'photo.jpg';
+  }
 }
 
 export function getImageUrl(imagePath) {

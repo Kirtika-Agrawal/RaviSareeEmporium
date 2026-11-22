@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl, trackEvent, trackView } from '../utils/api';
+import { fetchProduct, deleteVariant, deleteProduct, getImageUrl, getProxyUrl, viewerHeaders, fileNameOf, trackEvent, trackView } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 import { useAdmin } from '../hooks/useAdmin';
 import VariantModal from '../components/VariantModal';
@@ -105,8 +105,8 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
     const fileName = `${productId}-Colour${v.variant_number}`;
     const key = `${fileName}:${v.image_path}`;
     if (!cache.has(key)) {
-      const ext = (getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg').toLowerCase();
-      const promise = fetch(getProxyUrl(v.image_path))
+      const ext = (fileNameOf(getImageUrl(v.image_path)).split('.').pop() || 'jpg').toLowerCase();
+      const promise = fetch(getProxyUrl(v.image_path), { headers: viewerHeaders() })
         .then(res => {
           if (!res.ok) throw new Error();
           return res.blob();
@@ -185,7 +185,7 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = imageUrl.split('/').pop();
+      a.download = fileNameOf(imageUrl);
       a.click();
       URL.revokeObjectURL(url);
     } catch {

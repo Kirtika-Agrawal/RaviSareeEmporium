@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAdmin } from '../hooks/useAdmin';
 import { useToast } from '../hooks/useToast';
 import { fetchProducts, getImageUrl } from '../utils/api';
-import { getRecent } from '../utils/recent';
+import { getRecent, refreshRecent } from '../utils/recent';
+import { useAccess } from '../hooks/useAccess';
 import { productPath, categoryPath } from '../utils/routes';
 import { knownCategoryCounts, rememberCategoryCounts } from '../utils/categories';
 import { hasWhatsApp, whatsappLink, callLink, generalEnquiry } from '../utils/whatsapp';
@@ -18,6 +19,8 @@ const ICONS = {
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   camera: 'M3 8h4l2-3h6l2 3h4v12H3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
   tag: 'M3 12.5V4h8.5L21 13.5 13.5 21 3 12.5zM7.5 8v.01',
+  people: 'M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM21 20v-1a4 4 0 0 0-3-3.9M15.5 4.1a3.5 3.5 0 0 1 0 6.8',
+  logout: 'M9 4H5v16h4M14 8l4 4-4 4M18 12H9',
 };
 
 function Icon({ name }) {
@@ -38,6 +41,7 @@ export function MenuButton({ onClick }) {
 
 export default function SideMenu({ open, route, onClose, navigate }) {
   const { isAdmin } = useAdmin();
+  const access = useAccess();
   const toast = useToast();
   const [recent, setRecent] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -57,6 +61,8 @@ export default function SideMenu({ open, route, onClose, navigate }) {
         .then(products => {
           rememberCategoryCounts(products);
           setCategories(knownCategoryCounts());
+          refreshRecent(products);
+          setRecent(getRecent());
         })
         .catch(() => {});
     }
@@ -122,6 +128,7 @@ export default function SideMenu({ open, route, onClose, navigate }) {
             {navItem('/contact', page === 'contact', 'pin', 'Contact & visit')}
             {isAdmin && navItem('/identify', page === 'identify', 'camera', 'Find by photo (staff)')}
             {isAdmin && navItem('/stats', page === 'stats', 'chart', 'Stats (staff)')}
+            {isAdmin && navItem('/customers', page === 'customers', 'people', 'Customers (staff)')}
           </nav>
 
           {categories.length > 0 && (
@@ -175,6 +182,11 @@ export default function SideMenu({ open, route, onClose, navigate }) {
             <button className="menu-item" onClick={share}>
               <Icon name="share" /> Share this catalogue
             </button>
+            {!isAdmin && access.status === 'approved' && (
+              <button className="menu-item" onClick={() => { onClose(); access.logout(); }}>
+                <Icon name="logout" /> Log out
+              </button>
+            )}
           </section>
         </div>
 

@@ -87,7 +87,8 @@ async function download(url) {
 
 const uprightPhoto = (buffer) => sharp(buffer).rotate().toBuffer({ resolveWithObject: true });
 
-function createPhotoMatcher(db) {
+// photoUrl turns a stored image_path into a link that works on the private bucket.
+function createPhotoMatcher(db, { photoUrl }) {
   let indexing = false;
   let pausedUntil = 0;
 
@@ -180,7 +181,7 @@ function createPhotoMatcher(db) {
         const loaded = [];
         for (const item of pending.slice(i, i + PHOTOS_PER_REQUEST)) {
           try {
-            const upright = await uprightPhoto(await download(item.image_path));
+            const upright = await uprightPhoto(await download(await photoUrl(item.image_path)));
             loaded.push({ item, jpeg: await viewJpeg(upright, item.view) });
           } catch (err) {
             console.error(`Photo match: skipped variant ${item.id} ${item.view} (${err.message})`);

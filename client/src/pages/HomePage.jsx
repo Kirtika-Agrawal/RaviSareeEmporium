@@ -10,7 +10,7 @@ import StaffLoginModal from '../components/StaffLoginModal';
 import { MenuButton } from '../components/SideMenu';
 import { WhatsAppFab, useReserveBottom } from '../components/WhatsApp';
 import { hasWhatsApp, generalEnquiry } from '../utils/whatsapp';
-import { removeRecent } from '../utils/recent';
+import { removeRecent, refreshRecent } from '../utils/recent';
 import { countCategories, rememberCategoryCounts } from '../utils/categories';
 
 // Outlives HomePage while another page is open, so going back shows the same
@@ -70,7 +70,10 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
       setProducts(data);
       homeCache.products = data;
       homeCache.search = q;
-      if (!q) rememberCategoryCounts(data);
+      if (!q) {
+        rememberCategoryCounts(data);
+        refreshRecent(data);
+      }
     } catch (err) {
       toast(err.message, 'error');
     } finally {
