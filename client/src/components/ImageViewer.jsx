@@ -1,8 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { getImageUrl } from '../utils/api';
 import ZoomableImage from './ZoomableImage';
+import { WhatsAppIcon } from './WhatsApp';
+import { hasWhatsApp, whatsappLink, designEnquiry } from '../utils/whatsapp';
 
-export default function ImageViewer({ variants, startIndex, onClose, onDownload }) {
+export default function ImageViewer({ productId, variants, startIndex, onClose, onDownload }) {
   const trackRef = useRef(null);
   const pushedHistory = useRef(false);
   const [index, setIndex] = useState(startIndex);
@@ -108,6 +110,17 @@ export default function ImageViewer({ variants, startIndex, onClose, onDownload 
           {hasMany && <span className="viewer-count">{index + 1} / {variants.length}</span>}
         </span>
         <div style={{ display: 'flex', gap: 8 }}>
+          {hasWhatsApp && (
+            <a
+              className="viewer-btn viewer-wa"
+              href={whatsappLink(designEnquiry(productId, [current.variant_number]))}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Enquire about colour ${current.variant_number} on WhatsApp`}
+            >
+              <WhatsAppIcon size={20} />
+            </a>
+          )}
           <button
             className="viewer-btn"
             onClick={e => onDownload(e, getImageUrl(current.image_path))}

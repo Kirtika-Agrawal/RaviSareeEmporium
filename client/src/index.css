@@ -230,7 +230,7 @@ h1, h2, h3 {
 /* Toast */
 .toast-container {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(24px + var(--bottom-reserved, 0px));
   right: 24px;
   z-index: 9999;
   display: flex;
@@ -378,6 +378,68 @@ h1, h2, h3 {
 
 .fade-in {
   animation: fadeInUp 0.4s ease both;
+}
+
+/* WhatsApp enquiry */
+.wa-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  z-index: 50;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #25D366;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.wa-fab:hover { transform: scale(1.06); }
+
+.enquiry-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(61, 13, 24, 0.96);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(201, 168, 76, 0.3);
+}
+
+.enquiry-bar-inner {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  gap: 10px;
+}
+
+.btn-wa {
+  flex: 1;
+  justify-content: center;
+  background: #25D366;
+  color: #fff;
+  text-decoration: none;
+  padding: 13px 16px;
+}
+
+.btn-wa:hover { background: #20bd5a; }
+
+.btn-call {
+  justify-content: center;
+  text-decoration: none;
+  padding: 13px 22px;
+}
+
+.viewer-wa {
+  background: #25D366;
+  border-color: #25D366;
+  color: #fff;
 }
 
 /* Fullscreen colour viewer */

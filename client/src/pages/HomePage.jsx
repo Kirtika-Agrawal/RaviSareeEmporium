@@ -5,6 +5,8 @@ import { useAdmin } from '../hooks/useAdmin';
 import AddProductModal from '../components/AddProductModal';
 import ConfirmModal from '../components/ConfirmModal';
 import StaffLoginModal from '../components/StaffLoginModal';
+import { WhatsAppFab } from '../components/WhatsApp';
+import { hasWhatsApp, generalEnquiry } from '../utils/whatsapp';
 
 // Outlives HomePage while a product is open, so going back shows the same
 // list, search and scroll position immediately while a fresh copy loads.
@@ -302,6 +304,8 @@ export default function HomePage({ onSelectProduct }) {
           </div>
         )}
       </div>
+
+      {hasWhatsApp && <WhatsAppFab message={generalEnquiry} />}
 
       {showLogin && <StaffLoginModal onClose={() => setShowLogin(false)} />}
 

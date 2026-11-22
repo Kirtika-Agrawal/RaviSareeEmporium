@@ -6,6 +6,8 @@ import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
 import RenameModal from '../components/RenameModal';
 import ImageViewer from '../components/ImageViewer';
+import { EnquiryBar } from '../components/WhatsApp';
+import { hasWhatsApp, designEnquiry } from '../utils/whatsapp';
 
 export default function ProductPage({ productId, onBack, onRenamed }) {
   const toast = useToast();
@@ -141,8 +143,12 @@ const handleShareSelected = async () => {
     setExpandedDesc(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const selectedColours = product
+    ? product.variants.filter(v => selectedVariants.includes(v.id)).map(v => v.variant_number)
+    : [];
+
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
+    <div style={{ minHeight: '100vh', paddingBottom: hasWhatsApp ? 120 : 80 }}>
 
       {/* ── HEADER ── */}
       <header style={{
@@ -466,9 +472,19 @@ const handleShareSelected = async () => {
         )}
       </div>
 
+      {hasWhatsApp && product && (
+        <EnquiryBar
+          message={designEnquiry(productId, selectedColours)}
+          label={selectedColours.length
+            ? `Enquire about ${selectedColours.length} colour${selectedColours.length > 1 ? 's' : ''}`
+            : 'Enquire on WhatsApp'}
+        />
+      )}
+
       {/* ── FULLSCREEN IMAGE VIEWER (swipe between colours) ── */}
       {viewIndex !== null && product && (
         <ImageViewer
+          productId={productId}
           variants={product.variants}
           startIndex={viewIndex}
           onClose={closeViewer}
