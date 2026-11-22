@@ -69,20 +69,12 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
     onBack();
   };
 
-const handleDownloadSelected = async () => {
-  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-  toast(`Downloading ${selected.length} image${selected.length > 1 ? 's' : ''}...`, 'info');
-
-  for (const v of selected) {
-    try {
-      const res = await fetch(getProxyUrl(v.image_path)); // ← proxy
-      const blob = await res.blob();
-      const ext = getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg';
-      const fileName = `${productId}-Colour${v.variant_number}.${ext}`;
-      const blobUrl = URL.createObjectURL(blob);
+  const downloadFiles = async (files) => {
+    for (const file of files) {
+      const blobUrl = URL.createObjectURL(file);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = fileName;
+      a.download = file.name;
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
@@ -91,43 +83,37 @@ const handleDownloadSelected = async () => {
         URL.revokeObjectURL(blobUrl);
       }, 1000);
       await new Promise(r => setTimeout(r, 600));
-    } catch (err) {
-      toast(`Failed: Colour ${v.variant_number}`, 'error');
     }
-  }
-  toast('Done! ✓', 'success');
-};
+    toast(`Downloaded ${files.length} photo${files.length > 1 ? 's' : ''}`, 'success');
+  };
 
-const handleShareSelected = async () => {
-  const selected = product.variants.filter(v => selectedVariants.includes(v.id));
-  try {
+  const handleShareSelected = async () => {
+    const selected = product.variants.filter(v => selectedVariants.includes(v.id));
     toast('Preparing...', 'info');
-    const files = await Promise.all(
-      selected.map(async (v) => {
-        const res = await fetch(getProxyUrl(v.image_path)); // ← proxy
+    let files;
+    try {
+      files = await Promise.all(selected.map(async (v) => {
+        const res = await fetch(getProxyUrl(v.image_path));
+        if (!res.ok) throw new Error(`Colour ${v.variant_number}`);
         const blob = await res.blob();
         const ext = getImageUrl(v.image_path).split('.').pop().split('?')[0] || 'jpg';
-        return new File(
-          [blob],
-          `${productId}-Colour${v.variant_number}.${ext}`,
-          { type: blob.type }
-        );
-      })
-    );
-    if (navigator.canShare && navigator.canShare({ files })) {
-      await navigator.share({ files });
+        return new File([blob], `${productId}-Colour${v.variant_number}.${ext}`, { type: blob.type });
+      }));
+    } catch (err) {
+      toast(`Couldn't load ${err.message}, please try again`, 'error');
       return;
     }
-  } catch (err) {
-    console.error('Share failed:', err.message);
-  }
-  // Fallback
-  const selected2 = product.variants.filter(v => selectedVariants.includes(v.id));
-  for (const v of selected2) {
-    window.open(getImageUrl(v.image_path), '_blank');
-  }
-  toast('Long-press each image to save 💡', 'info');
-};
+
+    if (navigator.canShare?.({ files })) {
+      try {
+        await navigator.share({ files });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    downloadFiles(files);
+  };
 
   const handleDownload = async (e, imageUrl) => {
     e.stopPropagation();
@@ -187,21 +173,7 @@ const handleShareSelected = async () => {
             <div className="toolbar">
               {selectedVariants.length > 0 ? (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {/* Desktop: download */}
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleDownloadSelected}
-                    style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'none' : 'flex' }}
-                  >
-                    ⬇ Download {selectedVariants.length}
-                  </button>
-
-                  {/* Mobile: native share sheet */}
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={handleShareSelected}
-                    style={{ display: /Android|iPhone|iPad/i.test(navigator.userAgent) ? 'flex' : 'none' }}
-                  >
+                  <button className="btn btn-secondary btn-sm" onClick={handleShareSelected}>
                     ↗ Share {selectedVariants.length}
                   </button>
 

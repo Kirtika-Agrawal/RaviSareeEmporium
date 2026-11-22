@@ -523,7 +523,8 @@ h1, h2, h3 {
   color: #fff;
 }
 
-.toast-success { background: var(--ink); }
+.toast-success,
+.toast-info { background: var(--ink); }
 
 .toast-error { background: var(--danger); }
 
@@ -1048,16 +1049,62 @@ h1, h2, h3 {
   left: -4px;
 }
 
-.menu-btn.staff-btn { color: var(--muted); }
+.staff-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
 
-.menu-btn.staff-btn.on {
+.staff-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.staff-btn:hover .staff-icon { background: rgba(43, 26, 23, 0.06); }
+
+.staff-btn.on .staff-icon {
   background: var(--brand);
   color: #fff;
 }
 
-.menu-btn.staff-btn.on:hover { background: var(--brand-dark); }
+.staff-btn.on:hover .staff-icon { background: var(--brand-dark); }
 
-.menu-btn.staff-btn svg { width: 19px; height: 19px; }
+.staff-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.staff-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.staff-btn.on .staff-label { color: var(--brand); }
+
+/* Wide screens have room for the label beside the lock */
+@media (min-width: 640px) {
+  .staff-btn { flex-direction: row; gap: 6px; }
+  .staff-label { font-size: 0.74rem; padding-right: 6px; }
+}
 
 .menu-btn {
   width: 40px;

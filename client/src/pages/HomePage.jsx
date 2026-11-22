@@ -147,14 +147,16 @@ export default function HomePage({ category, onCategoryChange, onSelectProduct, 
           <p className="brand-sub">{isAdmin ? 'Catalogue manager' : 'Saree collection'}</p>
           <div className="home-staff">
             <button
-              className={`menu-btn staff-btn${isAdmin ? ' on' : ''}`}
+              className={`staff-btn${isAdmin ? ' on' : ''}`}
               onClick={toggleStaff}
-              aria-label={isAdmin ? 'Exit staff mode' : 'Staff login'}
               title={isAdmin ? 'Exit staff mode' : 'Staff login'}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d={isAdmin ? 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 7.6-1.7' : 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4'} />
-              </svg>
+              <span className="staff-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d={isAdmin ? 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 7.6-1.7' : 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4'} />
+                </svg>
+              </span>
+              <span className="staff-label">{isAdmin ? 'Logout' : 'Login'}</span>
             </button>
           </div>
           <div className="home-menu"><MenuButton onClick={onMenu} /></div>

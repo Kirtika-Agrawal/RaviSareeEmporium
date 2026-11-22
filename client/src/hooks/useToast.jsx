@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useCallback } from 'react';
 
 const ToastContext = createContext(null);
 
+const TOAST_ICONS = { success: '✦', info: '•', error: '✗' };
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
@@ -19,7 +21,7 @@ export function ToastProvider({ children }) {
       <div className="toast-container">
         {toasts.map(t => (
           <div key={t.id} className={`toast toast-${t.type}`}>
-            <span>{t.type === 'success' ? '✦' : '✗'}</span>
+            <span>{TOAST_ICONS[t.type] || TOAST_ICONS.success}</span>
             {t.message}
           </div>
         ))}
