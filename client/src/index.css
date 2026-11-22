@@ -124,6 +124,62 @@ h1, h2, h3 {
 
 .muted { color: var(--muted); font-size: 0.85rem; }
 
+/* Category chips */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px 14px;
+  padding: 2px 16px 4px;
+}
+
+.chip-row::-webkit-scrollbar { display: none; }
+
+.chip-row-wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+  margin: 0;
+  padding: 0;
+}
+
+.chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.chip:hover { border-color: #d6c7b0; }
+
+.chip.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.chip-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.chip.active .chip-count { color: rgba(255, 255, 255, 0.75); }
+
+.chip-sm {
+  padding: 5px 11px;
+  font-size: 0.8rem;
+}
+
 /* Photo cards */
 .card {
   cursor: pointer;
@@ -1041,6 +1097,12 @@ h1, h2, h3 {
 }
 
 .menu-item:hover { background: var(--bg); }
+
+.menu-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
 
 .menu-item.active {
   color: var(--brand);

@@ -8,6 +8,7 @@ import { MenuButton } from '../components/SideMenu';
 import { WhatsAppFab } from '../components/WhatsApp';
 import { hasWhatsApp, generalEnquiry } from '../utils/whatsapp';
 import { removeRecent } from '../utils/recent';
+import { countCategories, rememberCategoryCounts } from '../utils/categories';
 
 // Outlives HomePage while another page is open, so going back shows the same
 // list, search and scroll position immediately while a fresh copy loads.
@@ -17,7 +18,7 @@ export function rememberHomeScroll() {
   homeCache.scrollY = window.scrollY;
 }
 
-export default function HomePage({ onSelectProduct, onMenu }) {
+export default function HomePage({ category, onCategoryChange, onSelectProduct, onMenu }) {
   const toast = useToast();
   const { isAdmin, logout } = useAdmin();
   const [products, setProducts] = useState(homeCache.products ?? []);
@@ -38,6 +39,7 @@ export default function HomePage({ onSelectProduct, onMenu }) {
       setProducts(data);
       homeCache.products = data;
       homeCache.search = q;
+      if (!q) rememberCategoryCounts(data);
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -68,6 +70,10 @@ export default function HomePage({ onSelectProduct, onMenu }) {
     }
   };
 
+  const chips = countCategories(products);
+  if (category && !chips.some(c => c.name === category)) chips.push({ name: category, count: 0 });
+  const visible = category ? products.filter(p => p.category === category) : products;
+
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
       <header className="page-header" style={{ padding: '22px 16px 16px', textAlign: 'center' }}>
@@ -89,9 +95,31 @@ export default function HomePage({ onSelectProduct, onMenu }) {
       </header>
 
       <div className="page-body">
+        {chips.length > 0 && (
+          <div className="chip-row" role="toolbar" aria-label="Browse by category">
+            <button
+              className={`chip ${!category ? 'active' : ''}`}
+              aria-pressed={!category}
+              onClick={() => onCategoryChange(null)}
+            >
+              All <span className="chip-count">{products.length}</span>
+            </button>
+            {chips.map(c => (
+              <button
+                key={c.name}
+                className={`chip ${category === c.name ? 'active' : ''}`}
+                aria-pressed={category === c.name}
+                onClick={() => onCategoryChange(category === c.name ? null : c.name)}
+              >
+                {c.name} <span className="chip-count">{c.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="toolbar">
           <span className="muted">
-            {products.length} {products.length === 1 ? 'design' : 'designs'}
+            {visible.length} {category ? `${category} ` : ''}{visible.length === 1 ? 'design' : 'designs'}
             {search && ` matching "${search}"`}
           </span>
           {isAdmin && (
@@ -123,19 +151,29 @@ export default function HomePage({ onSelectProduct, onMenu }) {
             <h3>{search ? 'No designs found' : 'No designs yet'}</h3>
             <p>{search
               ? `No design number matches "${search}"`
-              : isAdmin ? 'Add your first product to get started!' : 'New designs are coming soon.'
+              : isAdmin ? 'Add your first design to get started.' : 'New designs are coming soon.'
             }</p>
             {!search && isAdmin && (
               <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginTop: 20 }}>
-                + Add First Product
+                + Add First Design
               </button>
             )}
           </div>
         )}
 
-        {products.length > 0 && (
+        {products.length > 0 && visible.length === 0 && (
+          <div className="empty-state fade-in">
+            <h3>No {category} designs {search ? 'found' : 'yet'}</h3>
+            <p>{search ? `Nothing in ${category} matches "${search}".` : 'Have a look at the rest of the collection.'}</p>
+            <button className="btn btn-secondary" onClick={() => onCategoryChange(null)} style={{ marginTop: 20 }}>
+              Show all designs
+            </button>
+          </div>
+        )}
+
+        {visible.length > 0 && (
           <div className="products-grid">
-            {products.map((p, i) => (
+            {visible.map((p, i) => (
               <div
                 key={p.product_id}
                 className="card fade-in"
@@ -166,6 +204,7 @@ export default function HomePage({ onSelectProduct, onMenu }) {
                 </div>
                 <h3 className="card-title">{p.product_id}</h3>
                 <p className="card-meta">
+                  {!category && p.category && `${p.category} · `}
                   {p.variant_count} colour{p.variant_count !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -178,6 +217,7 @@ export default function HomePage({ onSelectProduct, onMenu }) {
 
       {showAddModal && (
         <AddProductModal
+          defaultCategory={category}
           onClose={() => setShowAddModal(false)}
           onSuccess={handleProductAdded}
         />

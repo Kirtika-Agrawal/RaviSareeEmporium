@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import ImageUpload from './ImageUpload';
 import PasswordGate from './PasswordGate';
+import CategoryField from './CategoryField';
 import { createProduct, setAdminPassword, getAdminPassword } from '../utils/api';
 import { useToast } from '../hooks/useToast';
 
-export default function AddProductModal({ onClose, onSuccess }) {
+export default function AddProductModal({ defaultCategory, onClose, onSuccess }) {
   const toast = useToast();
   const [productId, setProductId] = useState('');
   const [description, setDescription] = useState('');
+  const [category, setCategory] = useState(defaultCategory || '');
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +37,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
       const fd = new FormData();
       fd.append('product_id', productId.trim().toUpperCase());
       fd.append('description', description);
+      fd.append('category', category);
       fd.append('image', file);
       const product = await createProduct(fd);
       toast(`Design ${product.product_id} created`);
@@ -74,6 +77,7 @@ export default function AddProductModal({ onClose, onSuccess }) {
                 onChange={e => setProductId(e.target.value.toUpperCase())}
               />
             </div>
+            <CategoryField value={category} onChange={setCategory} />
             <ImageUpload onFileSelect={handleFile} preview={preview} label="Photo of the first colour *" />
             <div>
               <label className="label">Description</label>

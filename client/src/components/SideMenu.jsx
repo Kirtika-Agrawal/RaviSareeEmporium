@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAdmin } from '../hooks/useAdmin';
 import { useToast } from '../hooks/useToast';
-import { getImageUrl } from '../utils/api';
+import { fetchProducts, getImageUrl } from '../utils/api';
 import { getRecent } from '../utils/recent';
-import { productPath } from '../utils/routes';
+import { productPath, categoryPath } from '../utils/routes';
+import { knownCategoryCounts, rememberCategoryCounts } from '../utils/categories';
 import { hasWhatsApp, whatsappLink, callLink, generalEnquiry } from '../utils/whatsapp';
 import { shop } from '../shop';
 import { WhatsAppIcon } from './WhatsApp';
@@ -16,6 +17,7 @@ const ICONS = {
   phone: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z',
   share: 'M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4',
   lock: 'M6 11h12v10H6zM8 11V7a4 4 0 0 1 8 0v4',
+  tag: 'M3 12.5V4h8.5L21 13.5 13.5 21 3 12.5zM7.5 8v.01',
 };
 
 function Icon({ name }) {
@@ -34,16 +36,31 @@ export function MenuButton({ onClick }) {
   );
 }
 
-export default function SideMenu({ open, page, onClose, navigate }) {
+export default function SideMenu({ open, route, onClose, navigate }) {
   const { isAdmin, logout } = useAdmin();
   const toast = useToast();
   const [showLogin, setShowLogin] = useState(false);
   const [recent, setRecent] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [brokenImages, setBrokenImages] = useState({});
+  const page = route.page;
+  const activeCategory = page === 'home' ? route.category : null;
 
   useEffect(() => {
     if (!open) return;
     setRecent(getRecent());
+    const known = knownCategoryCounts();
+    if (known) {
+      setCategories(known);
+    } else {
+      // Opened before the catalogue loaded, e.g. straight from a shared link.
+      fetchProducts()
+        .then(products => {
+          rememberCategoryCounts(products);
+          setCategories(knownCategoryCounts());
+        })
+        .catch(() => {});
+    }
     const onKey = (e) => e.key === 'Escape' && onClose();
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -73,11 +90,11 @@ export default function SideMenu({ open, page, onClose, navigate }) {
     }
   };
 
-  const navItem = (target, routePage, icon, label) => (
+  const navItem = (target, active, icon, label) => (
     <button
-      className={`menu-item ${page === routePage ? 'active' : ''}`}
+      className={`menu-item ${active ? 'active' : ''}`}
       onClick={() => navigate(target)}
-      aria-current={page === routePage ? 'page' : undefined}
+      aria-current={active ? 'page' : undefined}
     >
       <Icon name={icon} /> {label}
     </button>
@@ -101,10 +118,27 @@ export default function SideMenu({ open, page, onClose, navigate }) {
 
         <div className="side-menu-body">
           <nav className="menu-group">
-            {navItem('/', 'home', 'home', 'All designs')}
-            {navItem('/about', 'about', 'info', 'About us')}
-            {navItem('/contact', 'contact', 'pin', 'Contact & visit')}
+            {navItem('/', page === 'home' && !activeCategory, 'home', 'All designs')}
+            {navItem('/about', page === 'about', 'info', 'About us')}
+            {navItem('/contact', page === 'contact', 'pin', 'Contact & visit')}
           </nav>
+
+          {categories.length > 0 && (
+            <nav className="menu-group" aria-label="Browse by category">
+              <p className="menu-heading">Browse by category</p>
+              {categories.map(c => (
+                <button
+                  key={c.name}
+                  className={`menu-item ${activeCategory === c.name ? 'active' : ''}`}
+                  onClick={() => navigate(categoryPath(c.name))}
+                  aria-current={activeCategory === c.name ? 'page' : undefined}
+                >
+                  <Icon name="tag" /> {c.name}
+                  <span className="menu-count">{c.count}</span>
+                </button>
+              ))}
+            </nav>
+          )}
 
           {visibleRecent.length > 0 && (
             <section className="menu-group">

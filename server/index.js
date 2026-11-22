@@ -92,8 +92,26 @@ const initDb = async () => {
     CREATE INDEX IF NOT EXISTS idx_variants_product
       ON variants (product_id, variant_number)
   `);
+  const productColumns = await db.execute('PRAGMA table_info(products)');
+  if (!productColumns.rows.some(c => c.name === 'category')) {
+    await db.execute('ALTER TABLE products ADD COLUMN category TEXT');
+  }
   console.log('✅ Turso database ready');
 };
+
+// "  banarasi   silk " -> "Banarasi Silk", so the same category typed two ways
+// doesn't show up as two filters. Empty means no category.
+const normalizeCategory = (value) => {
+  const cleaned = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  if (!cleaned) return null;
+  return cleaned.toLowerCase().replace(/(^|[\s-])\S/g, ch => ch.toUpperCase());
+};
+
+const PRODUCT_LIST_COLUMNS = `
+  p.product_id, p.created_at, p.category,
+  (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
+  (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
+`;
 
 const https = require('https');
 
@@ -177,9 +195,7 @@ app.get('/api/products', async (req, res) => {
     if (search && search.trim()) {
       result = await db.execute({
         sql: `
-          SELECT p.product_id, p.created_at,
-            (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
-            (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
+          SELECT ${PRODUCT_LIST_COLUMNS}
           FROM products p
           WHERE p.product_id LIKE ?
           ORDER BY p.created_at DESC
@@ -188,9 +204,7 @@ app.get('/api/products', async (req, res) => {
       });
     } else {
       result = await db.execute(`
-        SELECT p.product_id, p.created_at,
-          (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
-          (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
+        SELECT ${PRODUCT_LIST_COLUMNS}
         FROM products p
         ORDER BY p.created_at DESC
       `);
@@ -224,7 +238,7 @@ app.get('/api/products/:productId', async (req, res) => {
 // POST /api/products
 app.post('/api/products', requireAuth, upload.single('image'), async (req, res) => {
   try {
-    const { product_id, description } = req.body;
+    const { product_id, description, category } = req.body;
     if (!product_id || !product_id.trim()) {
       if (req.file) await deleteFromS3(req.file.key);
       return res.status(400).json({ error: 'Product ID is required' });
@@ -242,19 +256,17 @@ app.post('/api/products', requireAuth, upload.single('image'), async (req, res) 
     }
 
     const imageUrl = req.file.location;
-    await db.execute({ sql: 'INSERT INTO products (product_id) VALUES (?)', args: [pid] });
+    await db.execute({
+      sql: 'INSERT INTO products (product_id, category) VALUES (?, ?)',
+      args: [pid, normalizeCategory(category)]
+    });
     await db.execute({
       sql: 'INSERT INTO variants (product_id, variant_number, image_path, description) VALUES (?, 1, ?, ?)',
       args: [pid, imageUrl, description || '']
     });
 
     const newProduct = await db.execute({
-      sql: `
-        SELECT p.product_id, p.created_at,
-          (SELECT v.image_path FROM variants v WHERE v.product_id = p.product_id ORDER BY v.variant_number ASC LIMIT 1) as first_image,
-          (SELECT COUNT(*) FROM variants v WHERE v.product_id = p.product_id) as variant_count
-        FROM products p WHERE p.product_id = ?
-      `,
+      sql: `SELECT ${PRODUCT_LIST_COLUMNS} FROM products p WHERE p.product_id = ?`,
       args: [pid]
     });
     res.status(201).json(newProduct.rows[0]);
@@ -360,12 +372,23 @@ app.delete('/api/variants/:id', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/products/:productId  { new_product_id }
+// PATCH /api/products/:productId  { new_product_id?, category? }
 app.patch('/api/products/:productId', requireAuth, async (req, res) => {
   try {
     const { productId } = req.params;
-    const newId = (req.body.new_product_id || '').trim().toUpperCase();
+    const hasCategory = Object.prototype.hasOwnProperty.call(req.body, 'category');
+    const newId = req.body.new_product_id === undefined
+      ? productId
+      : String(req.body.new_product_id).trim().toUpperCase();
     if (!newId) return res.status(400).json({ error: 'New Product ID is required' });
+
+    if (hasCategory) {
+      const updated = await db.execute({
+        sql: 'UPDATE products SET category = ? WHERE product_id = ?',
+        args: [normalizeCategory(req.body.category), productId]
+      });
+      if (updated.rowsAffected === 0) return res.status(404).json({ error: 'Product not found' });
+    }
     if (newId === productId) return res.json({ product_id: newId });
 
     const existing = await db.execute({
@@ -381,7 +404,7 @@ app.patch('/api/products/:productId', requireAuth, async (req, res) => {
     // so the product keeps its position in the catalogue.
     await db.batch([
       {
-        sql: 'INSERT INTO products (product_id, created_at) SELECT ?, created_at FROM products WHERE product_id = ?',
+        sql: 'INSERT INTO products (product_id, created_at, category) SELECT ?, created_at, category FROM products WHERE product_id = ?',
         args: [newId, productId]
       },
       { sql: 'UPDATE variants SET product_id = ? WHERE product_id = ?', args: [newId, productId] },

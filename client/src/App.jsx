@@ -6,7 +6,7 @@ import ProductPage from './pages/ProductPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import SideMenu from './components/SideMenu';
-import { parseRoute, productPath } from './utils/routes';
+import { parseRoute, productPath, categoryPath, currentPath } from './utils/routes';
 import { renameRecent } from './utils/recent';
 import { shop } from './shop';
 
@@ -28,19 +28,32 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const label = route.page === 'product' ? `Design ${route.id}` : PAGE_TITLES[route.page];
+    const label = route.page === 'product' ? `Design ${route.id}`
+      : route.page === 'home' ? route.category
+      : PAGE_TITLES[route.page];
     document.title = label ? `${label} · ${shop.name}` : shop.name;
   }, [route]);
 
   const navigate = (path) => {
     setMenuOpen(false);
-    if (path === window.location.pathname) {
+    if (path === currentPath()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    const next = parseRoute(path);
     if (route.page === 'home') rememberHomeScroll();
     window.history.pushState({ inApp: true }, '', path);
-    setRoute(parseRoute(path));
+    setRoute(next);
+    // Switching category from the menu keeps HomePage mounted, so it won't
+    // reset its own scroll.
+    if (route.page === 'home' && next.page === 'home') window.scrollTo(0, 0);
+  };
+
+  // Category buttons replace the entry rather than adding one, so Back still
+  // leaves the catalogue instead of stepping through every tap.
+  const setHomeCategory = (category) => {
+    window.history.replaceState(window.history.state, '', categoryPath(category));
+    setRoute({ page: 'home', category });
   };
 
   const goBack = () => {
@@ -51,7 +64,7 @@ export default function App() {
       window.history.back();
     } else {
       window.history.replaceState(null, '', '/');
-      setRoute({ page: 'home' });
+      setRoute({ page: 'home', category: null });
     }
   };
 
@@ -73,9 +86,14 @@ export default function App() {
         {route.page === 'about' && <AboutPage onBack={goBack} onMenu={openMenu} navigate={navigate} />}
         {route.page === 'contact' && <ContactPage onBack={goBack} onMenu={openMenu} />}
         {route.page === 'home' && (
-          <HomePage onSelectProduct={id => navigate(productPath(id))} onMenu={openMenu} />
+          <HomePage
+            category={route.category}
+            onCategoryChange={setHomeCategory}
+            onSelectProduct={id => navigate(productPath(id))}
+            onMenu={openMenu}
+          />
         )}
-        <SideMenu open={menuOpen} page={route.page} onClose={closeMenu} navigate={navigate} />
+        <SideMenu open={menuOpen} route={route} onClose={closeMenu} navigate={navigate} />
       </AdminProvider>
     </ToastProvider>
   );

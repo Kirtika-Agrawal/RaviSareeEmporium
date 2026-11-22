@@ -4,7 +4,7 @@ import { useToast } from '../hooks/useToast';
 import { useAdmin } from '../hooks/useAdmin';
 import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
-import RenameModal from '../components/RenameModal';
+import EditDetailsModal from '../components/EditDetailsModal';
 import ImageViewer from '../components/ImageViewer';
 import PageHeader from '../components/PageHeader';
 import { EnquiryBar } from '../components/WhatsApp';
@@ -24,7 +24,7 @@ export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
   const [expandedDesc, setExpandedDesc] = useState({});
   const [selectedVariants, setSelectedVariants] = useState([]);
   const [viewIndex, setViewIndex] = useState(null);
-  const [showRename, setShowRename] = useState(false);
+  const [showEditDetails, setShowEditDetails] = useState(false);
 
   const closeViewer = useCallback(() => setViewIndex(null), []);
 
@@ -155,7 +155,7 @@ const handleShareSelected = async () => {
     <div style={{ minHeight: '100vh', paddingBottom: hasWhatsApp ? 120 : 80 }}>
 
       <PageHeader
-        eyebrow="Design"
+        eyebrow={product?.category || 'Design'}
         title={productId}
         onBack={onBack}
         onMenu={onMenu}
@@ -215,8 +215,8 @@ const handleShareSelected = async () => {
               )}
               {isAdmin && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => setShowRename(true)} title="Rename product ID">
-                    ✏ Rename
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowEditDetails(true)} title="Change design number or category">
+                    ✏ Edit Details
                   </button>
                   <button className="btn btn-primary btn-sm" onClick={() => setShowAddVariant(true)}>
                     + Add Colour
@@ -342,11 +342,12 @@ const handleShareSelected = async () => {
       )}
 
       {/* ── MODALS ── */}
-      {showRename && (
-        <RenameModal
+      {showEditDetails && (
+        <EditDetailsModal
           productId={productId}
-          onClose={() => setShowRename(false)}
-          onRenamed={onRenamed}
+          category={product?.category}
+          onClose={() => setShowEditDetails(false)}
+          onSaved={newId => (newId === productId ? load() : onRenamed(newId))}
         />
       )}
 
