@@ -6,10 +6,12 @@ import VariantModal from '../components/VariantModal';
 import ConfirmModal from '../components/ConfirmModal';
 import RenameModal from '../components/RenameModal';
 import ImageViewer from '../components/ImageViewer';
+import PageHeader from '../components/PageHeader';
 import { EnquiryBar } from '../components/WhatsApp';
 import { hasWhatsApp, designEnquiry } from '../utils/whatsapp';
+import { addRecent, removeRecent } from '../utils/recent';
 
-export default function ProductPage({ productId, onBack, onRenamed }) {
+export default function ProductPage({ productId, onBack, onRenamed, onMenu }) {
   const toast = useToast();
   const { isAdmin } = useAdmin();
   const [product, setProduct] = useState(null);
@@ -39,6 +41,7 @@ export default function ProductPage({ productId, onBack, onRenamed }) {
     try {
       const data = await fetchProduct(productId);
       setProduct(data);
+      if (data.variants?.length) addRecent(productId, data.variants[0].image_path);
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -59,7 +62,8 @@ export default function ProductPage({ productId, onBack, onRenamed }) {
 
   const handleDeleteProduct = async () => {
     await deleteProduct(productId);
-    toast(`Product ${productId} deleted`);
+    removeRecent(productId);
+    toast(`Design ${productId} deleted`);
     onBack();
   };
 
@@ -150,32 +154,21 @@ const handleShareSelected = async () => {
   return (
     <div style={{ minHeight: '100vh', paddingBottom: hasWhatsApp ? 120 : 80 }}>
 
-      {/* ── HEADER ── */}
-      <header className="page-header" style={{ padding: '12px 16px' }}>
-        {/* Side columns share the leftover width, so the ID stays centred
-            whether or not the Delete button is shown. */}
-        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 12 }}>
-          <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ justifySelf: 'start' }}>
-            ← Back
+      <PageHeader
+        eyebrow="Design"
+        title={productId}
+        onBack={onBack}
+        onMenu={onMenu}
+        actions={isAdmin && (
+          <button
+            className="btn btn-danger-text btn-sm"
+            onClick={() => setShowDeleteProduct(true)}
+            title="Delete this design"
+          >
+            🗑 Delete
           </button>
-          <div style={{ textAlign: 'center' }}>
-            <div className="brand-sub" style={{ marginTop: 0 }}>Design</div>
-            <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', color: 'var(--brand)', lineHeight: 1.1, letterSpacing: '0.03em' }}>
-              {productId}
-            </h1>
-          </div>
-          {isAdmin ? (
-            <button
-              className="btn btn-danger-text btn-sm"
-              onClick={() => setShowDeleteProduct(true)}
-              style={{ justifySelf: 'end' }}
-              title="Delete entire product"
-            >
-              🗑 Delete
-            </button>
-          ) : <span />}
-        </div>
-      </header>
+        )}
+      />
 
       {/* ── MAIN CONTENT ── */}
       <div className="page-body">

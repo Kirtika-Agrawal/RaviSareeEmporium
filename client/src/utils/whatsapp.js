@@ -8,6 +8,9 @@ const NUMBER = digits.length === 10 ? `91${digits}` : digits;
 export const hasWhatsApp = NUMBER.length > 0;
 
 export const callLink = `tel:+${NUMBER}`;
+export const displayNumber = NUMBER.length === 12 && NUMBER.startsWith('91')
+  ? `+91 ${NUMBER.slice(2, 7)} ${NUMBER.slice(7)}`
+  : `+${NUMBER}`;
 
 export function whatsappLink(message) {
   return `https://wa.me/${NUMBER}?text=${encodeURIComponent(message)}`;

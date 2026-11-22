@@ -4,18 +4,22 @@ import { useToast } from '../hooks/useToast';
 import { useAdmin } from '../hooks/useAdmin';
 import AddProductModal from '../components/AddProductModal';
 import ConfirmModal from '../components/ConfirmModal';
-import StaffLoginModal from '../components/StaffLoginModal';
+import { MenuButton } from '../components/SideMenu';
 import { WhatsAppFab } from '../components/WhatsApp';
 import { hasWhatsApp, generalEnquiry } from '../utils/whatsapp';
+import { removeRecent } from '../utils/recent';
 
-// Outlives HomePage while a product is open, so going back shows the same
+// Outlives HomePage while another page is open, so going back shows the same
 // list, search and scroll position immediately while a fresh copy loads.
 const homeCache = { products: null, search: '', scrollY: 0 };
 
-export default function HomePage({ onSelectProduct }) {
+export function rememberHomeScroll() {
+  homeCache.scrollY = window.scrollY;
+}
+
+export default function HomePage({ onSelectProduct, onMenu }) {
   const toast = useToast();
   const { isAdmin, logout } = useAdmin();
-  const [showLogin, setShowLogin] = useState(false);
   const [products, setProducts] = useState(homeCache.products ?? []);
   const [loading, setLoading] = useState(!homeCache.products);
   const [search, setSearch] = useState(homeCache.search);
@@ -26,11 +30,6 @@ export default function HomePage({ onSelectProduct }) {
   useLayoutEffect(() => {
     if (homeCache.products) window.scrollTo(0, homeCache.scrollY);
   }, []);
-
-  const openProduct = (productId) => {
-    homeCache.scrollY = window.scrollY;
-    onSelectProduct(productId);
-  };
 
   const load = useCallback(async (q = '') => {
     setLoading(true);
@@ -60,7 +59,8 @@ export default function HomePage({ onSelectProduct }) {
   const handleDelete = async () => {
     try {
       await deleteProduct(deleteTarget.product_id);
-      toast(`Product ${deleteTarget.product_id} deleted`);
+      removeRecent(deleteTarget.product_id);
+      toast(`Design ${deleteTarget.product_id} deleted`);
       setDeleteTarget(null);
       load(search);
     } catch (err) {
@@ -71,8 +71,11 @@ export default function HomePage({ onSelectProduct }) {
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 80 }}>
       <header className="page-header" style={{ padding: '22px 16px 16px', textAlign: 'center' }}>
-        <h1 className="brand-title">Ravi Saree Emporium</h1>
-        <p className="brand-sub">{isAdmin ? 'Catalogue manager' : 'Saree collection'}</p>
+        <div className="home-header-inner">
+          <h1 className="brand-title">Ravi Saree Emporium</h1>
+          <p className="brand-sub">{isAdmin ? 'Catalogue manager' : 'Saree collection'}</p>
+          <div className="home-menu"><MenuButton onClick={onMenu} /></div>
+        </div>
 
         <div className="search-box">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
@@ -137,7 +140,7 @@ export default function HomePage({ onSelectProduct }) {
                 key={p.product_id}
                 className="card fade-in"
                 style={{ animationDelay: `${Math.min(i, 12) * 0.05}s` }}
-                onClick={() => openProduct(p.product_id)}
+                onClick={() => onSelectProduct(p.product_id)}
               >
                 <div className="card-photo">
                   {p.first_image && !imgErrors[p.product_id] ? (
@@ -169,17 +172,9 @@ export default function HomePage({ onSelectProduct }) {
             ))}
           </div>
         )}
-
-        {!isAdmin && (
-          <button className="staff-link" onClick={() => setShowLogin(true)}>
-            Staff login
-          </button>
-        )}
       </div>
 
       {hasWhatsApp && <WhatsAppFab message={generalEnquiry} />}
-
-      {showLogin && <StaffLoginModal onClose={() => setShowLogin(false)} />}
 
       {showAddModal && (
         <AddProductModal
