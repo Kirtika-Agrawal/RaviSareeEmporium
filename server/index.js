@@ -44,12 +44,15 @@ const photoUrl = async (imagePath) => {
     return imagePath;
   }
   if (!allowedImageHosts.has(host)) return imagePath;
+  return signedKeyUrl(getS3Key(imagePath));
+};
+
+const signedKeyUrl = async (key) => {
   const day = new Date().toISOString().slice(0, 10);
   if (day !== signedDay) {
     signedLinks.clear();
     signedDay = day;
   }
-  const key = getS3Key(imagePath);
   if (!signedLinks.has(key)) {
     signedLinks.set(key, await getSignedUrl(s3, new GetObjectCommand({ Bucket: BUCKET, Key: key }), {
       expiresIn: LINK_DAYS * 86400,
@@ -689,6 +692,26 @@ app.get('/api/stats', requireAuth, async (req, res) => {
 app.get('/api/identify/status', requireAuth, async (req, res) => {
   try {
     res.json(await photoMatcher.status());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/identify/dataset — every catalogue photo and every confirmed return,
+// with temporary links, for testing and training the photo matcher offline
+app.get('/api/identify/dataset', requireAuth, async (req, res) => {
+  try {
+    const [variants, returns] = await db.batch([
+      `SELECT v.id, v.product_id, v.variant_number, v.image_path, p.category
+       FROM variants v JOIN products p ON p.product_id = v.product_id
+       ORDER BY v.product_id, v.variant_number`,
+      `SELECT id, created_at, product_id, rank, suggested, hint, photo_path
+       FROM photo_match_feedback WHERE photo_path IS NOT NULL ORDER BY id`,
+    ], 'read');
+    res.json({
+      variants: await withPhotoUrls(variants.rows, 'image_path'),
+      returns: await Promise.all(returns.rows.map(async row => ({ ...row, photo_url: await signedKeyUrl(row.photo_path) }))),
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

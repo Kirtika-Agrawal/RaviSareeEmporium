@@ -220,6 +220,14 @@ Only staff and customers that staff approve can see designs and photos; the serv
 - Each browser stays logged in for 90 days after its last visit; Block on the Customers page logs a customer out everywhere at once
 - Link previews show only the title, never a photo, and the site asks search engines not to index it
 
+## 🔍 Find-by-photo lab
+
+`photo_model/photo_match_lab.ipynb` is a Google Colab notebook that scores matchers for Find by photo and trains one on the catalogue.
+
+- It reads the catalogue from the staff-only `GET /api/identify/dataset` route, using the staff password from Colab Secrets (`STAFF_PASSWORD`)
+- It compares the live Gemini matcher with DINOv2 on fabric pieces, before and after training on disguised catalogue photos (turned, creased, relit, blurred), plus any returns staff have confirmed
+- Photos, scores and the trained model are kept in Google Drive under `saree_lab/`
+
 ## 🔐 Admin Authentication
 
 All create, edit, and delete operations are protected by an admin password.
